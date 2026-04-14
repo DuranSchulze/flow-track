@@ -1,0 +1,220 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// generator erd {
+//   provider = "prisma-erd-generator"
+//   output   = "ERD.svg" // or "ERD.pdf"
+// }
+// npx prisma generate
+
+datasource db {
+  provider = "postgresql"
+}
+
+1
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum MemberStatus {
+  INVITED
+  ACTIVE
+  DISABLED
+}
+
+model User {
+  id            String            @id
+  name          String
+  email         String            @unique
+  emailVerified Boolean           @default(false)
+  image         String?
+  phone         String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  memberships   WorkspaceMember[]
+  timeEntries   TimeEntry[]
+  sessions      Session[]
+  accounts      Account[]
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
+}
+
+model Workspace {
+  id          String            @id @default(cuid())
+  name        String
+  slug        String            @unique
+  timezone    String            @default("Asia/Manila")
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  members     WorkspaceMember[]
+  departments Department[]
+  cohorts     Cohort[]
+  projects    Project[]
+  tags        Tag[]
+  timeEntries TimeEntry[]
+}
+
+model WorkspaceMember {
+  id             String            @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email          String
+  role           WorkspaceRole     @default(EMPLOYEE)
+  status         MemberStatus      @default(INVITED)
+  jobTitle       String?
+  employeeId     String?
+  hireDate       DateTime?
+  departmentId   String?
+  department     Department?       @relation("DepartmentMembers", fields: [departmentId], references: [id], onDelete: SetNull)
+  invitedById    String?
+  invitedBy      WorkspaceMember?  @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  invitees       WorkspaceMember[] @relation("InvitedBy")
+  ledDepartments Department[]      @relation("DepartmentHead")
+  cohorts        CohortMember[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([workspaceId, email])
+  @@unique([workspaceId, employeeId])
+  @@index([workspaceId, role])
+}
+
+model Department {
+  id           String            @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  color        String            @default("#6366f1")
+  headMemberId String?
+  head         WorkspaceMember?  @relation("DepartmentHead", fields: [headMemberId], references: [id], onDelete: SetNull)
+  members      WorkspaceMember[] @relation("DepartmentMembers")
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@unique([workspaceId, name])
+}
+
+model Cohort {
+  id          String         @id @default(cuid())
+  workspaceId String
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  members     CohortMember[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([workspaceId, name])
+}
+
+model CohortMember {
+  cohortId String
+  cohort   Cohort          @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  memberId String
+  member   WorkspaceMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@id([cohortId, memberId])
+}
+
+model Project {
+  id          String      @id @default(cuid())
+  workspaceId String
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  color       String      @default("#2563eb")
+  archived    Boolean     @default(false)
+  entries     TimeEntry[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([workspaceId, name])
+}
+
+model Tag {
+  id          String         @id @default(cuid())
+  workspaceId String
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  color       String         @default("#14b8a6")
+  archived    Boolean        @default(false)
+  entries     TimeEntryTag[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([workspaceId, name])
+}
+
+model TimeEntry {
+  id              String         @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  description     String
+  projectId       String?
+  project         Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  billable        Boolean        @default(false)
+  startedAt       DateTime
+  endedAt         DateTime?
+  durationSeconds Int            @default(0)
+  notes           String?
+  tags            TimeEntryTag[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([workspaceId, userId, startedAt])
+  @@index([workspaceId, endedAt])
+}
+
+model TimeEntryTag {
+  timeEntryId String
+  timeEntry   TimeEntry @relation(fields: [timeEntryId], references: [id], onDelete: Cascade)
+  tagId       String
+  tag         Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([timeEntryId, tagId])
+}
