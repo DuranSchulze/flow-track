@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "vite dev --port 3000",
-    "build": "vite build",
+    "build": "prisma generate && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint",
@@ -70,8 +70,10 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "@prisma/engines",
       "esbuild",
-      "lightningcss"
+      "lightningcss",
+      "prisma"
     ]
   }
 }
