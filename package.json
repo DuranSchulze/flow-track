@@ -21,6 +21,7 @@
     "db:seed": "dotenv -e .env.local -- prisma db seed"
   },
   "dependencies": {
+    "@better-auth/infra": "^0.2.3",
     "@fontsource-variable/dm-sans": "^5.2.8",
     "@prisma/adapter-pg": "^7.4.2",
     "@prisma/client": "^7.4.2",

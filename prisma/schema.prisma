@@ -3,17 +3,9 @@ generator client {
   output   = "../src/generated/prisma"
 }
 
-// generator erd {
-//   provider = "prisma-erd-generator"
-//   output   = "ERD.svg" // or "ERD.pdf"
-// }
-// npx prisma generate
-
 datasource db {
   provider = "postgresql"
 }
-
-1
 
 enum WorkspaceRole {
   OWNER
