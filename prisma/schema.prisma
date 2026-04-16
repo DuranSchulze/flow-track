@@ -7,7 +7,22 @@ datasource db {
   provider = "postgresql"
 }
 
-enum WorkspaceRole {
+enum Gender {
+  MALE
+  FEMALE
+  NON_BINARY
+  PREFER_NOT_TO_SAY
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  SEPARATED
+  WIDOWED
+  DIVORCED
+}
+
+enum RolePermission {
   OWNER
   ADMIN
   MANAGER
@@ -20,193 +35,319 @@ enum MemberStatus {
   DISABLED
 }
 
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACTOR
+  INTERN
+  PROBATIONARY
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  ON_LEAVE
+  RESIGNED
+  TERMINATED
+}
+
 model User {
-  id            String            @id
-  name          String
-  email         String            @unique
-  emailVerified Boolean           @default(false)
+  id            String            @id @default(cuid()) @db.VarChar(30)
+  name          String            @db.VarChar(150)
+  email         String            @unique @db.VarChar(255)
+  emailVerified Boolean           @default(false) @map("email_verified")
   image         String?
-  phone         String?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+  profile       UserProfile?
   memberships   WorkspaceMember[]
-  timeEntries   TimeEntry[]
   sessions      Session[]
   accounts      Account[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id            String         @id @default(cuid()) @db.VarChar(30)
+  userId        String         @unique @map("user_id") @db.VarChar(30)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName     String         @map("first_name") @db.VarChar(50)
+  middleName    String?        @map("middle_name") @db.VarChar(50)
+  lastName      String         @map("last_name") @db.VarChar(50)
+  birthDate     DateTime?      @map("birth_date") @db.Date
+  gender        Gender?
+  maritalStatus MaritalStatus? @map("marital_status")
+  contactNumber String?        @map("contact_number") @db.VarChar(50)
+  address       UserAddress?
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  @@index([lastName, firstName])
+  @@map("user_profiles")
+}
+
+model UserAddress {
+  id            String      @id @default(cuid()) @db.VarChar(30)
+  userProfileId String      @unique @map("user_profile_id") @db.VarChar(30)
+  userProfile   UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+  buildingNo    String?     @map("building_no") @db.VarChar(50)
+  street        String?     @db.VarChar(100)
+  city          String?     @db.VarChar(100)
+  province      String?     @db.VarChar(100)
+  postalCode    String?     @map("postal_code") @db.VarChar(20)
+  country       String      @default("Philippines") @db.VarChar(100)
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  @@index([city, province])
+  @@map("user_addresses")
+}
+
+model EmployeeProfile {
+  id                 String                @id @default(cuid()) @db.VarChar(30)
+  workspaceMemberId  String                @unique @map("workspace_member_id") @db.VarChar(30)
+  workspaceMember    WorkspaceMember       @relation(fields: [workspaceMemberId], references: [id], onDelete: Cascade)
+  employeeNumber     String?               @map("employee_number") @db.VarChar(50)
+  positionTitle      String?               @map("position_title") @db.VarChar(100)
+  employmentType     EmploymentType        @default(FULL_TIME) @map("employment_type")
+  employmentStatus   EmploymentStatus      @default(ACTIVE) @map("employment_status")
+  hireDate           DateTime?             @map("hire_date") @db.Date
+  regularizationDate DateTime?             @map("regularization_date") @db.Date
+  separationDate     DateTime?             @map("separation_date") @db.Date
+  governmentIds      EmployeeGovernmentId?
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
+
+  @@unique([employeeNumber])
+  @@index([employmentStatus])
+  @@map("employee_profiles")
+}
+
+model EmployeeGovernmentId {
+  id                String          @id @default(cuid()) @db.VarChar(30)
+  employeeProfileId String          @unique @map("employee_profile_id") @db.VarChar(30)
+  employeeProfile   EmployeeProfile @relation(fields: [employeeProfileId], references: [id], onDelete: Cascade)
+  sssNumber         String?         @unique @map("sss") @db.VarChar(25)
+  philHealthNumber  String?         @unique @map("phic") @db.VarChar(25)
+  tinNumber         String?         @unique @map("tin") @db.VarChar(25)
+  pagIbigNumber     String?         @unique @map("phmd") @db.VarChar(25)
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  @@map("employee_government_ids")
 }
 
 model Session {
-  id        String   @id
-  expiresAt DateTime
-  token     String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  ipAddress String?
-  userAgent String?
-  userId    String
+  id        String   @id @db.VarChar(255)
+  expiresAt DateTime @map("expires_at")
+  token     String   @unique @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  userId    String   @map("user_id") @db.VarChar(30)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
 }
 
 model Account {
-  id                    String    @id
-  accountId             String
-  providerId            String
-  userId                String
+  id                    String    @id @db.VarChar(255)
+  accountId             String    @map("account_id") @db.VarChar(255)
+  providerId            String    @map("provider_id") @db.VarChar(255)
+  userId                String    @map("user_id") @db.VarChar(30)
   user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accessToken           String?
-  refreshToken          String?
-  idToken               String?
-  accessTokenExpiresAt  DateTime?
-  refreshTokenExpiresAt DateTime?
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  idToken               String?   @map("id_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
   scope                 String?
   password              String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("accounts")
 }
 
 model Verification {
-  id         String    @id
-  identifier String
+  id         String    @id @db.VarChar(255)
+  identifier String    @db.VarChar(255)
   value      String
-  expiresAt  DateTime
-  createdAt  DateTime? @default(now())
-  updatedAt  DateTime? @updatedAt
+  expiresAt  DateTime  @map("expires_at")
+  createdAt  DateTime? @default(now()) @map("created_at")
+  updatedAt  DateTime? @updatedAt @map("updated_at")
+
+  @@map("verifications")
 }
 
 model Workspace {
-  id          String            @id @default(cuid())
-  name        String
-  slug        String            @unique
-  timezone    String            @default("Asia/Manila")
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id          String            @id @default(cuid()) @db.VarChar(30)
+  name        String            @db.VarChar(150)
+  slug        String            @unique @db.VarChar(120)
+  timezone    String            @default("Asia/Manila") @db.VarChar(80)
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
   members     WorkspaceMember[]
+  roles       WorkspaceRole[]
   departments Department[]
   cohorts     Cohort[]
   projects    Project[]
   tags        Tag[]
   timeEntries TimeEntry[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceRole {
+  id              String            @id @default(cuid()) @db.VarChar(30)
+  workspaceId     String            @map("workspace_id") @db.VarChar(30)
+  workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name            String            @db.VarChar(100)
+  permissionLevel RolePermission    @default(EMPLOYEE) @map("permission_level")
+  color           String            @default("#6366f1") @db.VarChar(20)
+  members         WorkspaceMember[]
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, permissionLevel])
+  @@map("workspace_roles")
 }
 
 model WorkspaceMember {
-  id             String            @id @default(cuid())
-  workspaceId    String
-  workspace      Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  userId         String?
-  user           User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
-  email          String
-  role           WorkspaceRole     @default(EMPLOYEE)
-  status         MemberStatus      @default(INVITED)
-  jobTitle       String?
-  employeeId     String?
-  hireDate       DateTime?
-  departmentId   String?
-  department     Department?       @relation("DepartmentMembers", fields: [departmentId], references: [id], onDelete: SetNull)
-  invitedById    String?
-  invitedBy      WorkspaceMember?  @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
-  invitees       WorkspaceMember[] @relation("InvitedBy")
-  ledDepartments Department[]      @relation("DepartmentHead")
-  cohorts        CohortMember[]
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  id              String            @id @default(cuid()) @db.VarChar(30)
+  workspaceId     String            @map("workspace_id") @db.VarChar(30)
+  workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId          String?           @map("user_id") @db.VarChar(30)
+  user            User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email           String            @db.VarChar(255)
+  workspaceRoleId String?           @map("workspace_role_id") @db.VarChar(30)
+  workspaceRole   WorkspaceRole?    @relation(fields: [workspaceRoleId], references: [id], onDelete: SetNull)
+  status          MemberStatus      @default(INVITED)
+  departmentId    String?           @map("department_id") @db.VarChar(30)
+  department      Department?       @relation("DepartmentMembers", fields: [departmentId], references: [id], onDelete: SetNull)
+  employeeProfile EmployeeProfile?
+  timeEntries     TimeEntry[]
+  invitedById     String?           @map("invited_by_id") @db.VarChar(30)
+  invitedBy       WorkspaceMember?  @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  invitees        WorkspaceMember[] @relation("InvitedBy")
+  ledDepartments  Department[]      @relation("DepartmentHead")
+  cohorts         CohortMember[]
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
 
   @@unique([workspaceId, email])
-  @@unique([workspaceId, employeeId])
-  @@index([workspaceId, role])
+  @@index([workspaceId, workspaceRoleId])
+  @@index([userId])
+  @@index([departmentId])
+  @@index([invitedById])
+  @@map("workspace_members")
 }
 
 model Department {
-  id           String            @id @default(cuid())
-  workspaceId  String
+  id           String            @id @default(cuid()) @db.VarChar(30)
+  workspaceId  String            @map("workspace_id") @db.VarChar(30)
   workspace    Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name         String
+  name         String            @db.VarChar(120)
   description  String?
-  color        String            @default("#6366f1")
-  headMemberId String?
+  color        String            @default("#6366f1") @db.VarChar(20)
+  headMemberId String?           @map("head_member_id") @db.VarChar(30)
   head         WorkspaceMember?  @relation("DepartmentHead", fields: [headMemberId], references: [id], onDelete: SetNull)
   members      WorkspaceMember[] @relation("DepartmentMembers")
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
 
   @@unique([workspaceId, name])
+  @@index([headMemberId])
+  @@map("departments")
 }
 
 model Cohort {
-  id          String         @id @default(cuid())
-  workspaceId String
+  id          String         @id @default(cuid()) @db.VarChar(30)
+  workspaceId String         @map("workspace_id") @db.VarChar(30)
   workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name        String
+  name        String         @db.VarChar(120)
   members     CohortMember[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
 
   @@unique([workspaceId, name])
+  @@map("cohorts")
 }
 
 model CohortMember {
-  cohortId String
+  cohortId String          @map("cohort_id") @db.VarChar(30)
   cohort   Cohort          @relation(fields: [cohortId], references: [id], onDelete: Cascade)
-  memberId String
+  memberId String          @map("member_id") @db.VarChar(30)
   member   WorkspaceMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@id([cohortId, memberId])
+  @@index([memberId])
+  @@map("cohort_members")
 }
 
 model Project {
-  id          String      @id @default(cuid())
-  workspaceId String
+  id          String      @id @default(cuid()) @db.VarChar(30)
+  workspaceId String      @map("workspace_id") @db.VarChar(30)
   workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name        String
-  color       String      @default("#2563eb")
+  name        String      @db.VarChar(120)
+  color       String      @default("#2563eb") @db.VarChar(20)
   archived    Boolean     @default(false)
   entries     TimeEntry[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
 
   @@unique([workspaceId, name])
+  @@map("projects")
 }
 
 model Tag {
-  id          String         @id @default(cuid())
-  workspaceId String
+  id          String         @id @default(cuid()) @db.VarChar(30)
+  workspaceId String         @map("workspace_id") @db.VarChar(30)
   workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name        String
-  color       String         @default("#14b8a6")
+  name        String         @db.VarChar(80)
+  color       String         @default("#14b8a6") @db.VarChar(20)
   archived    Boolean        @default(false)
   entries     TimeEntryTag[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
 
   @@unique([workspaceId, name])
+  @@map("tags")
 }
 
 model TimeEntry {
-  id              String         @id @default(cuid())
-  workspaceId     String
-  workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  userId          String
-  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  description     String
-  projectId       String?
-  project         Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  billable        Boolean        @default(false)
-  startedAt       DateTime
-  endedAt         DateTime?
-  durationSeconds Int            @default(0)
-  notes           String?
-  tags            TimeEntryTag[]
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  id                String          @id @default(cuid()) @db.VarChar(30)
+  workspaceId       String          @map("workspace_id") @db.VarChar(30)
+  workspace         Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceMemberId String          @map("workspace_member_id") @db.VarChar(30)
+  workspaceMember   WorkspaceMember @relation(fields: [workspaceMemberId], references: [id], onDelete: Cascade)
+  description       String
+  projectId         String?         @map("project_id") @db.VarChar(30)
+  project           Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  billable          Boolean         @default(false)
+  startedAt         DateTime        @map("started_at")
+  endedAt           DateTime?       @map("ended_at")
+  durationSeconds   Int             @default(0) @map("duration_seconds")
+  notes             String?
+  tags              TimeEntryTag[]
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
 
-  @@index([workspaceId, userId, startedAt])
+  @@index([workspaceId, workspaceMemberId, startedAt])
   @@index([workspaceId, endedAt])
+  @@index([projectId])
+  @@map("time_entries")
 }
 
 model TimeEntryTag {
-  timeEntryId String
+  timeEntryId String    @map("time_entry_id") @db.VarChar(30)
   timeEntry   TimeEntry @relation(fields: [timeEntryId], references: [id], onDelete: Cascade)
-  tagId       String
+  tagId       String    @map("tag_id") @db.VarChar(30)
   tag         Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([timeEntryId, tagId])
+  @@index([tagId])
+  @@map("time_entry_tags")
 }

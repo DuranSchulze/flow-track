@@ -1,4 +1,4 @@
-export type WorkspaceRole = 'OWNER' | 'ADMIN' | 'EMPLOYEE'
+export type RolePermission = 'OWNER' | 'ADMIN' | 'MANAGER' | 'EMPLOYEE'
 
 export type ViewMode = 'day' | 'week' | 'month'
 
@@ -6,6 +6,13 @@ export type Workspace = {
   id: string
   name: string
   timezone: string
+}
+
+export type WorkspaceRole = {
+  id: string
+  name: string
+  permissionLevel: RolePermission
+  color: string
 }
 
 export type Department = {
@@ -34,7 +41,9 @@ export type Member = {
   id: string
   name: string
   email: string
-  role: WorkspaceRole
+  workspaceRoleId: string
+  roleName: string
+  permissionLevel: RolePermission
   departmentId: string
   cohortIds: string[]
   status: 'ACTIVE' | 'INVITED' | 'DISABLED'
@@ -42,7 +51,7 @@ export type Member = {
 
 export type TimeEntry = {
   id: string
-  userId: string
+  workspaceMemberId: string
   description: string
   projectId: string
   tagIds: string[]
@@ -55,7 +64,8 @@ export type TimeEntry = {
 
 export type TrackerState = {
   workspace: Workspace
-  currentUserId: string
+  currentMemberId: string
+  roles: WorkspaceRole[]
   departments: Department[]
   cohorts: Cohort[]
   projects: Project[]
@@ -63,4 +73,3 @@ export type TrackerState = {
   members: Member[]
   entries: TimeEntry[]
 }
-
