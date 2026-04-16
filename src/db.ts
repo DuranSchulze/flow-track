@@ -1,6 +1,10 @@
+import { config } from 'dotenv'
 import { PrismaClient } from './generated/prisma/client.js'
 
 import { PrismaPg } from '@prisma/adapter-pg'
+
+config({ path: '.env.local', quiet: true })
+config({ quiet: true })
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL!,

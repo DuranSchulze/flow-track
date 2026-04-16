@@ -1,10 +1,9 @@
-import { Link, Outlet } from '@tanstack/react-router'
+import { Link, Outlet, useNavigate } from '@tanstack/react-router'
 import {
   BarChart3,
   BriefcaseBusiness,
   CalendarDays,
   ClipboardList,
-  FolderKanban,
   LayoutDashboard,
   LogOut,
   Settings,
@@ -13,7 +12,7 @@ import {
   Users,
 } from 'lucide-react'
 import { authClient } from '#/lib/auth-client'
-import { initialTrackerState } from '#/lib/time-tracker/store'
+import type { Workspace } from '#/lib/time-tracker/types'
 
 const navItems = [
   { to: '/app/time-tracker', label: 'Timer', icon: LayoutDashboard },
@@ -25,24 +24,35 @@ const navItems = [
   { to: '/app/workspace/settings', label: 'Settings', icon: Settings },
 ]
 
-export function AppShell() {
-  const { data: session } = authClient.useSession()
-  const userName = session?.user?.name || 'Ana Santos'
-  const userEmail = session?.user?.email || 'ana@duranfilepino.com'
+export function AppShell({
+  workspace,
+  user,
+}: {
+  workspace: Workspace
+  user: { id: string; name: string; email: string }
+}) {
+  const navigate = useNavigate()
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="flex min-h-16 flex-wrap items-center gap-3 px-4 sm:px-6">
-          <Link to="/app/time-tracker" className="flex items-center gap-3 no-underline">
+          <Link
+            to="/app/time-tracker"
+            className="flex items-center gap-3 no-underline"
+          >
             <img
               src="/logo192.png"
               alt=""
               className="h-9 w-9 rounded-lg border border-slate-200 bg-white"
             />
             <div>
-              <p className="m-0 text-sm font-bold text-slate-950">Clockify Timer</p>
-              <p className="m-0 text-xs text-slate-500">Internal workspace tracking</p>
+              <p className="m-0 text-sm font-bold text-slate-950">
+                Clockify Timer
+              </p>
+              <p className="m-0 text-xs text-slate-500">
+                Internal workspace tracking
+              </p>
             </div>
           </Link>
 
@@ -50,7 +60,7 @@ export function AppShell() {
             <div className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 sm:flex">
               <BriefcaseBusiness className="h-4 w-4 text-slate-500" />
               <span className="text-sm font-semibold text-slate-800">
-                {initialTrackerState.workspace.name}
+                {workspace.name}
               </span>
             </div>
             <Link
@@ -58,25 +68,22 @@ export function AppShell() {
               className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 no-underline hover:bg-slate-50"
             >
               <UserCircle className="h-4 w-4" />
-              <span className="hidden sm:inline">{userName}</span>
+              <span className="hidden sm:inline">{user.name}</span>
             </Link>
-            {session?.user ? (
-              <button
-                type="button"
-                onClick={() => void authClient.signOut()}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline">Sign out</span>
-              </button>
-            ) : (
-              <Link
-                to="/auth"
-                className="rounded-lg bg-slate-950 px-3 py-2 text-sm font-semibold text-white no-underline hover:bg-slate-800"
-              >
-                Sign in
-              </Link>
-            )}
+            <button
+              type="button"
+              onClick={() =>
+                void authClient.signOut({
+                  fetchOptions: {
+                    onSuccess: () => void navigate({ to: '/auth' }),
+                  },
+                })
+              }
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Sign out</span>
+            </button>
           </div>
         </div>
       </header>
@@ -88,9 +95,9 @@ export function AppShell() {
               Workspace
             </p>
             <p className="m-0 mt-1 text-sm font-bold text-slate-950">
-              {initialTrackerState.workspace.name}
+              {workspace.name}
             </p>
-            <p className="m-0 mt-1 text-xs text-slate-500">{userEmail}</p>
+            <p className="m-0 mt-1 text-xs text-slate-500">{user.email}</p>
           </div>
 
           <nav className="grid gap-1">
@@ -121,4 +128,3 @@ export function AppShell() {
     </div>
   )
 }
-

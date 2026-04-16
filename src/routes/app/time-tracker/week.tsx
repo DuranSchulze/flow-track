@@ -1,7 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { TimeTrackerDashboard } from '#/components/time-tracker/TimeTrackerDashboard'
+import { getTrackerStateFn } from '#/lib/server/tracker'
 
 export const Route = createFileRoute('/app/time-tracker/week')({
-  component: () => <TimeTrackerDashboard view="week" />,
+  loader: () => getTrackerStateFn(),
+  component: WeekRoute,
 })
 
+function WeekRoute() {
+  const state = Route.useLoaderData()
+  return <TimeTrackerDashboard state={state} view="week" />
+}

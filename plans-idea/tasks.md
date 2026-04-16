@@ -6,8 +6,31 @@
 - [x] Add authenticated app shell with navbar and sidebar.
 - [x] Add interactive Time Tracker MVP screens with seeded local data.
 - [x] Add profile, workspace settings, members, and catalogs screens.
-- [ ] Wire server actions/API handlers to Prisma.
-- [ ] Connect Better Auth session to workspace membership enforcement.
-- [ ] Add integration tests for auth, permissions, timer rules, and reports.
-- [ ] Add production seed/migration workflow.
+- [x] Wire server actions/API handlers to Prisma.
+  - [x] Timer CRUD (start, stop, create manual, update, delete, duplicate)
+  - [x] Workspace member invite (createWorkspaceMember)
+  - [x] Workspace role create (createWorkspaceRole)
+  - [x] Catalog CRUD — Projects (create, update, archive)
+  - [x] Catalog CRUD — Tags (create, update, archive)
+  - [x] Catalog CRUD — Departments (create, update, delete)
+  - [x] Catalog CRUD — Cohorts (create, update, delete)
+  - [x] Member management — update role, department, cohorts (updateWorkspaceMember)
+  - [x] Member management — disable / reactivate (setMemberStatus)
+  - [x] Profile update (updateProfile)
+  - [x] Workspace settings update (updateWorkspaceSettings)
+- [x] Connect Better Auth session to workspace membership enforcement.
+- [x] Wire catalog/member/profile/settings mutations into UI screens.
+  - [x] CatalogsScreen — Projects manager (create, archive)
+  - [x] CatalogsScreen — Tags manager (create, archive)
+  - [x] CatalogsScreen — Departments manager (create, delete)
+  - [x] CatalogsScreen — Cohorts manager (create, delete)
+  - [x] MembersScreen — inline role, department, cohort edit + disable/reactivate
+  - [x] SettingsScreen — editable workspace name and timezone form (Owner only)
+  - [x] ProfileScreen — editable display name, first/last name, contact form
+- [x] Add integration tests for auth, permissions, timer rules, and reports.
+  - Tests located at: src/lib/server/__tests__/tracker.test.ts
+  - Run with: pnpm test
+- [x] Add production seed/migration workflow.
+  - Seed script: prisma/seed.ts — run with: pnpm db:seed
+  - Migration: pnpm db:migrate (dev), pnpm db:push (direct push)
 
