@@ -41,6 +41,7 @@ export type Member = {
   id: string
   name: string
   email: string
+  image: string | null
   workspaceRoleId: string
   roleName: string
   permissionLevel: RolePermission

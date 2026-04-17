@@ -9,6 +9,7 @@ Create a private company time tracking app where employees can track work by wor
 - Owner: creates a workspace, manages members, catalogs, settings, and all reports.
 - Admin: manages members, catalogs, and all workspace reports.
 - Employee: tracks personal time and views personal totals.
+- Time Agent Tracker: manages projects/tags and views member time progress by department.
 
 ## Core Flow
 
@@ -26,4 +27,3 @@ Create a private company time tracking app where employees can track work by wor
 - Employees only see and manage their own entries.
 - Owner/Admin users can view all entries and totals in the workspace.
 - Every query and write must be scoped by workspace membership.
-

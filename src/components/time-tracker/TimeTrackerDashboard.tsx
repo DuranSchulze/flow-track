@@ -1,7 +1,20 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { gooeyToast } from 'goey-toast'
 import { useRouter } from '@tanstack/react-router'
-import { Copy, Pause, Pencil, Play, Plus, Save, Trash2 } from 'lucide-react'
+import {
+  ArrowDownUp,
+  Check,
+  ChevronDown,
+  Copy,
+  Filter,
+  Pause,
+  Pencil,
+  Play,
+  Plus,
+  Save,
+  Trash2,
+  X,
+} from 'lucide-react'
 import {
   dateTimeLocalValue,
   formatDuration,
@@ -12,6 +25,8 @@ import {
 } from '#/lib/time-tracker/store'
 import {
   createManualEntryFn,
+  createProjectFn,
+  createTagFn,
   deleteEntryFn,
   duplicateEntryFn,
   startTimerFn,
@@ -33,6 +48,8 @@ type DraftEntry = {
   endedAt: string
   notes: string
 }
+
+type SortKey = 'newest' | 'oldest' | 'longest' | 'shortest'
 
 const emptyDraft = (projectId = '', tagId = ''): DraftEntry => {
   const start = new Date()
@@ -60,6 +77,11 @@ export function TimeTrackerDashboard({
 }) {
   const router = useRouter()
   const [tick, setTick] = useState(() => Date.now())
+
+  // ── Input mode toggle ──
+  const [inputMode, setInputMode] = useState<'timer' | 'manual'>('timer')
+
+  // ── Timer state ──
   const [timerDescription, setTimerDescription] = useState('')
   const [timerProjectId, setTimerProjectId] = useState(
     state.projects[0]?.id || '',
@@ -68,13 +90,27 @@ export function TimeTrackerDashboard({
     state.tags[0]?.id || '',
   ])
   const [timerBillable, setTimerBillable] = useState(false)
+
+  // ── Manual draft state ──
   const [draft, setDraft] = useState<DraftEntry>(() =>
     emptyDraft(state.projects[0]?.id || '', state.tags[0]?.id || ''),
   )
+
+  // ── Inline edit state ──
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingDraft, setEditingDraft] = useState<DraftEntry>(() =>
     emptyDraft(state.projects[0]?.id || '', state.tags[0]?.id || ''),
   )
+
+  // ── Filter + sort state ──
+  const [filterProject, setFilterProject] = useState('')
+  const [filterTag, setFilterTag] = useState('')
+  const [filterBillable, setFilterBillable] = useState<'all' | 'yes' | 'no'>(
+    'all',
+  )
+  const [sortKey, setSortKey] = useState<SortKey>('newest')
+  const [showFilters, setShowFilters] = useState(false)
+
   const [pending, setPending] = useState(false)
 
   useEffect(() => {
@@ -83,52 +119,82 @@ export function TimeTrackerDashboard({
   }, [])
 
   useEffect(() => {
-    if (!timerProjectId && state.projects[0]) {
+    if (!timerProjectId && state.projects[0])
       setTimerProjectId(state.projects[0].id)
-    }
-    if (!timerTagIds.filter(Boolean).length && state.tags[0]) {
+    if (!timerTagIds.filter(Boolean).length && state.tags[0])
       setTimerTagIds([state.tags[0].id])
-    }
   }, [state.projects, state.tags, timerProjectId, timerTagIds])
 
-  const currentUser = state.members.find(
-    (member) => member.id === state.currentMemberId,
-  )!
+  const currentUser = state.members.find((m) => m.id === state.currentMemberId)!
   const activeEntry = state.entries.find(
-    (entry) =>
-      entry.workspaceMemberId === state.currentMemberId && !entry.endedAt,
+    (e) => e.workspaceMemberId === state.currentMemberId && !e.endedAt,
   )
-  const filteredEntries = useFilteredEntries(
+  const baseFiltered = useFilteredEntries(
     state.entries,
     view,
     state.currentMemberId,
   )
 
+  // Apply filter + sort on top of the view-filtered entries
+  const filteredEntries = useMemo(() => {
+    let result = [...baseFiltered]
+
+    if (filterProject)
+      result = result.filter((e) => e.projectId === filterProject)
+    if (filterTag) result = result.filter((e) => e.tagIds.includes(filterTag))
+    if (filterBillable === 'yes') result = result.filter((e) => e.billable)
+    if (filterBillable === 'no') result = result.filter((e) => !e.billable)
+
+    result.sort((a, b) => {
+      if (sortKey === 'newest')
+        return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+      if (sortKey === 'oldest')
+        return new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime()
+      if (sortKey === 'longest')
+        return getEntrySeconds(b, tick) - getEntrySeconds(a, tick)
+      if (sortKey === 'shortest')
+        return getEntrySeconds(a, tick) - getEntrySeconds(b, tick)
+      return 0
+    })
+
+    return result
+  }, [baseFiltered, filterProject, filterTag, filterBillable, sortKey, tick])
+
   const totals = useMemo(() => {
-    const selectedTotal = filteredEntries.reduce(
-      (sum, entry) => sum + getEntrySeconds(entry, tick),
+    const selectedTotal = baseFiltered.reduce(
+      (sum, e) => sum + getEntrySeconds(e, tick),
       0,
     )
     const allPersonal = state.entries
-      .filter((entry) => entry.workspaceMemberId === state.currentMemberId)
-      .reduce((sum, entry) => sum + getEntrySeconds(entry, tick), 0)
-    const billable = filteredEntries
-      .filter((entry) => entry.billable)
-      .reduce((sum, entry) => sum + getEntrySeconds(entry, tick), 0)
-
+      .filter((e) => e.workspaceMemberId === state.currentMemberId)
+      .reduce((sum, e) => sum + getEntrySeconds(e, tick), 0)
+    const billable = baseFiltered
+      .filter((e) => e.billable)
+      .reduce((sum, e) => sum + getEntrySeconds(e, tick), 0)
     return { selectedTotal, allPersonal, billable }
-  }, [filteredEntries, state.currentMemberId, state.entries, tick])
+  }, [baseFiltered, state.currentMemberId, state.entries, tick])
 
   const range = getViewRange(view)
 
+  const activeFilterCount = [
+    filterProject !== '',
+    filterTag !== '',
+    filterBillable !== 'all',
+    sortKey !== 'newest',
+  ].filter(Boolean).length
+
   function selectedTags(tagIds: string[]) {
-    return state.tags.filter((tag) => tagIds.includes(tag.id))
+    return state.tags.filter((t) => tagIds.includes(t.id))
   }
 
-  function calculateManualSeconds(entryDraft: DraftEntry) {
-    const start = new Date(entryDraft.startedAt)
-    const end = new Date(entryDraft.endedAt)
-    return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000))
+  function calculateManualSeconds(d: DraftEntry) {
+    return Math.max(
+      0,
+      Math.floor(
+        (new Date(d.endedAt).getTime() - new Date(d.startedAt).getTime()) /
+          1000,
+      ),
+    )
   }
 
   async function runMutation(
@@ -139,42 +205,32 @@ export function TimeTrackerDashboard({
     try {
       await action()
       await router.invalidate()
-      if (successMessage) {
-        gooeyToast.success(successMessage)
-      }
-    } catch (mutationError) {
+      if (successMessage) gooeyToast.success(successMessage)
+    } catch (err) {
       gooeyToast.error('Action failed', {
         description:
-          mutationError instanceof Error
-            ? mutationError.message
-            : 'Something went wrong. Please try again.',
+          err instanceof Error ? err.message : 'Something went wrong.',
       })
     } finally {
       setPending(false)
     }
   }
 
-  function toEntryPayload(entryDraft: DraftEntry) {
-    const startedAt = new Date(entryDraft.startedAt)
-    const endedAt = new Date(entryDraft.endedAt)
-
+  function toEntryPayload(d: DraftEntry) {
     return {
-      description: entryDraft.description.trim(),
-      projectId: entryDraft.projectId,
-      tagIds: entryDraft.tagIds.filter(Boolean),
-      billable: entryDraft.billable,
-      startedAt: startedAt.toISOString(),
-      endedAt: endedAt.toISOString(),
-      durationSeconds: calculateManualSeconds(entryDraft),
-      notes: entryDraft.notes.trim(),
+      description: d.description.trim(),
+      projectId: d.projectId,
+      tagIds: d.tagIds.filter(Boolean),
+      billable: d.billable,
+      startedAt: new Date(d.startedAt).toISOString(),
+      endedAt: new Date(d.endedAt).toISOString(),
+      durationSeconds: calculateManualSeconds(d),
+      notes: d.notes.trim(),
     }
   }
 
   function startTimer() {
-    if (activeEntry || !timerDescription.trim()) {
-      return
-    }
-
+    if (activeEntry || !timerDescription.trim()) return
     void runMutation(async () => {
       await startTimerFn({
         data: {
@@ -189,10 +245,7 @@ export function TimeTrackerDashboard({
   }
 
   function stopTimer() {
-    if (!activeEntry) {
-      return
-    }
-
+    if (!activeEntry) return
     void runMutation(
       () => stopTimerFn({ data: { id: activeEntry.id } }),
       'Timer stopped',
@@ -200,10 +253,7 @@ export function TimeTrackerDashboard({
   }
 
   function addManualEntry() {
-    if (!draft.description.trim() || calculateManualSeconds(draft) <= 0) {
-      return
-    }
-
+    if (!draft.description.trim() || calculateManualSeconds(draft) <= 0) return
     void runMutation(async () => {
       await createManualEntryFn({ data: toEntryPayload(draft) })
       setDraft(emptyDraft(state.projects[0]?.id || '', state.tags[0]?.id || ''))
@@ -235,24 +285,38 @@ export function TimeTrackerDashboard({
   }
 
   function saveEdit() {
-    if (!editingId || !editingDraft.description.trim()) {
-      return
-    }
-
+    if (!editingId || !editingDraft.description.trim()) return
     void runMutation(async () => {
       await updateEntryFn({
-        data: {
-          id: editingId,
-          ...toEntryPayload(editingDraft),
-        },
+        data: { id: editingId, ...toEntryPayload(editingDraft) },
       })
       setEditingId(null)
     }, 'Entry saved')
   }
 
+  function clearFilters() {
+    setFilterProject('')
+    setFilterTag('')
+    setFilterBillable('all')
+    setSortKey('newest')
+  }
+
+  async function handleCreateProject(name: string, color: string) {
+    await runMutation(async () => {
+      await createProjectFn({ data: { name, color } })
+    }, `Project "${name}" created`)
+  }
+
+  async function handleCreateTag(name: string, color: string) {
+    await runMutation(async () => {
+      await createTagFn({ data: { name, color } })
+    }, `Tag "${name}" created`)
+  }
+
   return (
     <div className="grid gap-6">
-      <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      {/* ── Header + metrics ── */}
+      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="m-0 text-sm font-semibold text-teal-700">
@@ -262,7 +326,7 @@ export function TimeTrackerDashboard({
               Time Tracker
             </h1>
             <p className="m-0 mt-1 text-sm text-slate-500">
-              {currentUser.name} - {currentUser.role}
+              {currentUser.name} · {currentUser.roleName}
             </p>
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-right">
@@ -274,77 +338,9 @@ export function TimeTrackerDashboard({
             </p>
           </div>
         </div>
-
-        <div className="grid gap-3 lg:grid-cols-[1fr_180px_180px_150px]">
-          <input
-            value={timerDescription}
-            onChange={(event) => setTimerDescription(event.target.value)}
-            placeholder="What are you working on?"
-            className="h-11 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600"
-          />
-          <select
-            value={timerProjectId}
-            onChange={(event) => setTimerProjectId(event.target.value)}
-            className="h-11 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600"
-          >
-            {state.projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={timerTagIds[0] || ''}
-            onChange={(event) => setTimerTagIds([event.target.value])}
-            className="h-11 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600"
-          >
-            {state.tags.map((tag) => (
-              <option key={tag.id} value={tag.id}>
-                {tag.name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={activeEntry ? stopTimer : startTimer}
-            disabled={pending || (!activeEntry && !timerDescription.trim())}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-          >
-            {activeEntry ? (
-              <Pause className="h-4 w-4" />
-            ) : (
-              <Play className="h-4 w-4" />
-            )}
-            {activeEntry ? 'Stop' : 'Start'}
-          </button>
-        </div>
-
-        <label className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-slate-700">
-          <input
-            type="checkbox"
-            checked={timerBillable}
-            onChange={(event) => setTimerBillable(event.target.checked)}
-          />
-          Billable
-        </label>
-
-        {activeEntry && (
-          <div className="rounded-lg border border-teal-200 bg-teal-50 p-4">
-            <p className="m-0 text-sm font-semibold text-teal-800">
-              Running now
-            </p>
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-              <p className="m-0 font-bold text-slate-950">
-                {activeEntry.description}
-              </p>
-              <p className="m-0 font-mono text-2xl font-bold text-slate-950">
-                {formatDuration(getEntrySeconds(activeEntry, tick))}
-              </p>
-            </div>
-          </div>
-        )}
       </section>
 
+      {/* ── Metrics row ── */}
       <section className="grid gap-4 lg:grid-cols-3">
         <Metric
           label="Selected range"
@@ -360,45 +356,263 @@ export function TimeTrackerDashboard({
         />
       </section>
 
-      <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="m-0 text-lg font-bold text-slate-950">
-              Manual entry
-            </h2>
-            <p className="m-0 mt-1 text-sm text-slate-500">
-              Add time when work was tracked outside the timer.
-            </p>
-          </div>
+      {/* ── Input section with toggle ── */}
+      <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        {/* Toggle tabs */}
+        <div className="flex border-b border-slate-200">
           <button
             type="button"
-            onClick={addManualEntry}
-            disabled={pending}
-            className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white hover:bg-teal-800"
+            onClick={() => setInputMode('timer')}
+            className={`flex-1 py-3 text-sm font-bold transition-colors ${
+              inputMode === 'timer'
+                ? 'border-b-2 border-slate-950 text-slate-950'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
           >
-            <Plus className="h-4 w-4" />
-            Add entry
+            <Play className="mr-1.5 inline h-3.5 w-3.5" />
+            Timer
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputMode('manual')}
+            className={`flex-1 py-3 text-sm font-bold transition-colors ${
+              inputMode === 'manual'
+                ? 'border-b-2 border-slate-950 text-slate-950'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Pencil className="mr-1.5 inline h-3.5 w-3.5" />
+            Manual entry
           </button>
         </div>
-        <EntryDraftForm
-          draft={draft}
-          setDraft={setDraft}
-          projects={state.projects}
-          tags={state.tags}
-        />
+
+        <div className="p-4">
+          {/* ── Timer panel ── */}
+          {inputMode === 'timer' && (
+            <div className="grid gap-3">
+              <div className="grid gap-3 lg:grid-cols-[1fr_200px_200px_130px]">
+                <input
+                  value={timerDescription}
+                  onChange={(e) => setTimerDescription(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && startTimer()}
+                  placeholder="What are you working on?"
+                  disabled={!!activeEntry}
+                  className="h-11 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600 disabled:bg-slate-50 disabled:text-slate-400"
+                />
+                <ProjectPicker
+                  projects={state.projects}
+                  value={timerProjectId}
+                  onChange={setTimerProjectId}
+                  onCreate={handleCreateProject}
+                  disabled={!!activeEntry}
+                />
+                <TagPicker
+                  tags={state.tags}
+                  value={timerTagIds}
+                  onChange={setTimerTagIds}
+                  onCreate={handleCreateTag}
+                  disabled={!!activeEntry}
+                />
+                <button
+                  type="button"
+                  onClick={activeEntry ? stopTimer : startTimer}
+                  disabled={
+                    pending || (!activeEntry && !timerDescription.trim())
+                  }
+                  className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold text-white transition-colors disabled:cursor-not-allowed disabled:bg-slate-300 ${
+                    activeEntry
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : 'bg-slate-950 hover:bg-slate-800'
+                  }`}
+                >
+                  {activeEntry ? (
+                    <Pause className="h-4 w-4" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
+                  {activeEntry ? 'Stop' : 'Start'}
+                </button>
+              </div>
+
+              {!activeEntry && (
+                <label className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={timerBillable}
+                    onChange={(e) => setTimerBillable(e.target.checked)}
+                  />
+                  Billable
+                </label>
+              )}
+
+              {activeEntry && (
+                <div className="rounded-lg border border-teal-200 bg-teal-50 p-4">
+                  <p className="m-0 text-xs font-bold uppercase tracking-wide text-teal-600">
+                    Running now
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                    <p className="m-0 font-bold text-slate-950">
+                      {activeEntry.description}
+                    </p>
+                    <p className="m-0 font-mono text-2xl font-bold text-slate-950">
+                      {formatDuration(getEntrySeconds(activeEntry, tick))}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Manual entry panel ── */}
+          {inputMode === 'manual' && (
+            <div className="grid gap-3">
+              <p className="m-0 text-sm text-slate-500">
+                Add time when work was tracked outside the timer.
+              </p>
+              <EntryDraftForm
+                draft={draft}
+                setDraft={setDraft}
+                projects={state.projects}
+                tags={state.tags}
+                onCreateProject={handleCreateProject}
+                onCreateTag={handleCreateTag}
+              />
+              <div>
+                <button
+                  type="button"
+                  onClick={addManualEntry}
+                  disabled={
+                    pending ||
+                    !draft.description.trim() ||
+                    calculateManualSeconds(draft) <= 0
+                  }
+                  className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add entry
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </section>
 
+      {/* ── Entries section ── */}
       <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4">
-          <div>
-            <h2 className="m-0 text-lg font-bold text-slate-950">Entries</h2>
-            <p className="m-0 mt-1 text-sm text-slate-500">
-              {range.start.toLocaleDateString()} to{' '}
-              {new Date(range.end.getTime() - 1).toLocaleDateString()}
-            </p>
+        {/* Entries header + filter controls */}
+        <div className="border-b border-slate-200 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="m-0 text-lg font-bold text-slate-950">Entries</h2>
+              <p className="m-0 mt-1 text-sm text-slate-500">
+                {range.start.toLocaleDateString()} –{' '}
+                {new Date(range.end.getTime() - 1).toLocaleDateString()}
+                {filteredEntries.length !== baseFiltered.length && (
+                  <span className="ml-2 text-teal-700 font-semibold">
+                    {filteredEntries.length} of {baseFiltered.length} shown
+                  </span>
+                )}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                >
+                  <X className="h-3 w-3" />
+                  Clear ({activeFilterCount})
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowFilters((p) => !p)}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors ${
+                  showFilters || activeFilterCount > 0
+                    ? 'border-slate-950 bg-slate-950 text-white'
+                    : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <Filter className="h-3.5 w-3.5" />
+                Filter / Sort
+                {activeFilterCount > 0 && (
+                  <span className="ml-0.5 rounded-full bg-white px-1.5 text-xs font-bold text-slate-950">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
+
+          {/* Filter + sort panel */}
+          {showFilters && (
+            <div className="mt-3 grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                Project
+                <select
+                  value={filterProject}
+                  onChange={(e) => setFilterProject(e.target.value)}
+                  className="h-8 rounded border border-slate-300 bg-white px-2 text-sm outline-none focus:border-teal-600"
+                >
+                  <option value="">All projects</option>
+                  {state.projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                Tag
+                <select
+                  value={filterTag}
+                  onChange={(e) => setFilterTag(e.target.value)}
+                  className="h-8 rounded border border-slate-300 bg-white px-2 text-sm outline-none focus:border-teal-600"
+                >
+                  <option value="">All tags</option>
+                  {state.tags.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                Billable
+                <select
+                  value={filterBillable}
+                  onChange={(e) =>
+                    setFilterBillable(e.target.value as 'all' | 'yes' | 'no')
+                  }
+                  className="h-8 rounded border border-slate-300 bg-white px-2 text-sm outline-none focus:border-teal-600"
+                >
+                  <option value="all">All entries</option>
+                  <option value="yes">Billable only</option>
+                  <option value="no">Non-billable only</option>
+                </select>
+              </label>
+              <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                <span className="inline-flex items-center gap-1">
+                  <ArrowDownUp className="h-3 w-3" />
+                  Sort by
+                </span>
+                <select
+                  value={sortKey}
+                  onChange={(e) => setSortKey(e.target.value as SortKey)}
+                  className="h-8 rounded border border-slate-300 bg-white px-2 text-sm outline-none focus:border-teal-600"
+                >
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="longest">Longest first</option>
+                  <option value="shortest">Shortest first</option>
+                </select>
+              </label>
+            </div>
+          )}
         </div>
 
+        {/* Entries table */}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px] border-collapse text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
@@ -412,101 +626,148 @@ export function TimeTrackerDashboard({
               </tr>
             </thead>
             <tbody>
-              {filteredEntries.map((entry) => {
-                const project = state.projects.find(
-                  (item) => item.id === entry.projectId,
-                )
-                return (
-                  <tr key={entry.id} className="border-t border-slate-100">
-                    <td className="px-4 py-3">
-                      {editingId === entry.id ? (
-                        <EntryDraftForm
-                          compact
-                          draft={editingDraft}
-                          setDraft={setEditingDraft}
-                          projects={state.projects}
-                          tags={state.tags}
-                        />
-                      ) : (
-                        <div>
-                          <p className="m-0 font-semibold text-slate-950">
-                            {entry.description}
-                          </p>
-                          <p className="m-0 mt-1 text-xs text-slate-500">
-                            {new Date(entry.startedAt).toLocaleString()}
-                          </p>
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                        {project?.name || 'No project'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {selectedTags(entry.tagIds).map((tag) => (
-                          <span
-                            key={tag.id}
-                            className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600"
-                          >
-                            {tag.name}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {entry.billable ? 'Yes' : 'No'}
-                    </td>
-                    <td className="px-4 py-3 font-mono font-bold">
-                      {formatDuration(getEntrySeconds(entry, tick))}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
+              {filteredEntries.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-4 py-10 text-center text-sm text-slate-400"
+                  >
+                    {baseFiltered.length === 0
+                      ? 'No entries in this period yet.'
+                      : 'No entries match your filters.'}
+                  </td>
+                </tr>
+              ) : (
+                filteredEntries.map((entry) => {
+                  const project = state.projects.find(
+                    (p) => p.id === entry.projectId,
+                  )
+                  return (
+                    <tr key={entry.id} className="border-t border-slate-100">
+                      <td className="px-4 py-3">
                         {editingId === entry.id ? (
-                          <button
-                            type="button"
-                            onClick={saveEdit}
-                            disabled={pending}
-                            className="rounded-lg bg-slate-950 p-2 text-white"
-                            aria-label="Save entry"
-                          >
-                            <Save className="h-4 w-4" />
-                          </button>
+                          <EntryDraftForm
+                            compact
+                            draft={editingDraft}
+                            setDraft={setEditingDraft}
+                            projects={state.projects}
+                            tags={state.tags}
+                            onCreateProject={handleCreateProject}
+                            onCreateTag={handleCreateTag}
+                          />
                         ) : (
+                          <div>
+                            <p className="m-0 font-semibold text-slate-950">
+                              {entry.description}
+                            </p>
+                            <p className="m-0 mt-1 text-xs text-slate-500">
+                              {new Date(entry.startedAt).toLocaleString()}
+                            </p>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {project ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                            <span
+                              className="inline-block h-2 w-2 rounded-full"
+                              style={{ backgroundColor: project.color }}
+                            />
+                            {project.name}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400">
+                            No project
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {selectedTags(entry.tagIds).map((tag) => (
+                            <span
+                              key={tag.id}
+                              className="rounded-lg border border-slate-200 px-2 py-0.5 text-xs font-semibold"
+                              style={{
+                                color: tag.color,
+                                borderColor: tag.color + '55',
+                              }}
+                            >
+                              {tag.name}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`rounded px-1.5 py-0.5 text-xs font-bold ${
+                            entry.billable
+                              ? 'bg-teal-100 text-teal-800'
+                              : 'text-slate-400'
+                          }`}
+                        >
+                          {entry.billable ? 'Billable' : '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-mono font-bold">
+                        {formatDuration(getEntrySeconds(entry, tick))}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          {editingId === entry.id ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={saveEdit}
+                                disabled={pending}
+                                className="rounded-lg bg-slate-950 p-2 text-white hover:bg-slate-800"
+                                aria-label="Save entry"
+                              >
+                                <Save className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingId(null)}
+                                className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
+                                aria-label="Cancel edit"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => openEdit(entry)}
+                              disabled={pending}
+                              className="rounded-lg border border-slate-200 p-2 text-slate-700 hover:bg-slate-50"
+                              aria-label="Edit entry"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                          )}
                           <button
                             type="button"
-                            onClick={() => openEdit(entry)}
+                            onClick={() => duplicateEntry(entry)}
                             disabled={pending}
                             className="rounded-lg border border-slate-200 p-2 text-slate-700 hover:bg-slate-50"
-                            aria-label="Edit entry"
+                            aria-label="Duplicate entry"
                           >
-                            <Pencil className="h-4 w-4" />
+                            <Copy className="h-4 w-4" />
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => duplicateEntry(entry)}
-                          disabled={pending}
-                          className="rounded-lg border border-slate-200 p-2 text-slate-700 hover:bg-slate-50"
-                          aria-label="Duplicate entry"
-                        >
-                          <Copy className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeEntry(entry.id)}
-                          disabled={pending}
-                          className="rounded-lg border border-red-200 p-2 text-red-700 hover:bg-red-50"
-                          aria-label="Delete entry"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
+                          <button
+                            type="button"
+                            onClick={() => removeEntry(entry.id)}
+                            disabled={pending}
+                            className="rounded-lg border border-red-200 p-2 text-red-700 hover:bg-red-50"
+                            aria-label="Delete entry"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -531,85 +792,428 @@ function EntryDraftForm({
   setDraft,
   projects,
   tags,
+  onCreateProject,
+  onCreateTag,
   compact = false,
 }: {
   draft: DraftEntry
   setDraft: (draft: DraftEntry) => void
-  projects: { id: string; name: string }[]
-  tags: { id: string; name: string }[]
+  projects: { id: string; name: string; color: string }[]
+  tags: { id: string; name: string; color: string }[]
+  onCreateProject?: (name: string, color: string) => Promise<void>
+  onCreateTag?: (name: string, color: string) => Promise<void>
   compact?: boolean
 }) {
   return (
     <div className={compact ? 'grid gap-2' : 'grid gap-3 lg:grid-cols-6'}>
       <input
         value={draft.description}
-        onChange={(event) =>
-          setDraft({ ...draft, description: event.target.value })
-        }
+        onChange={(e) => setDraft({ ...draft, description: e.target.value })}
         placeholder="Task description"
         className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600 lg:col-span-2"
       />
-      <select
+      <ProjectPicker
+        projects={projects}
         value={draft.projectId}
-        onChange={(event) =>
-          setDraft({ ...draft, projectId: event.target.value })
-        }
-        className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600"
-      >
-        {projects.map((project) => (
-          <option key={project.id} value={project.id}>
-            {project.name}
-          </option>
-        ))}
-      </select>
-      <select
-        value={draft.tagIds[0] || ''}
-        onChange={(event) =>
-          setDraft({ ...draft, tagIds: [event.target.value] })
-        }
-        className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600"
-      >
-        {tags.map((tag) => (
-          <option key={tag.id} value={tag.id}>
-            {tag.name}
-          </option>
-        ))}
-      </select>
+        onChange={(id) => setDraft({ ...draft, projectId: id })}
+        onCreate={onCreateProject ?? (() => Promise.resolve())}
+      />
+      <TagPicker
+        tags={tags}
+        value={draft.tagIds}
+        onChange={(ids) => setDraft({ ...draft, tagIds: ids })}
+        onCreate={onCreateTag ?? (() => Promise.resolve())}
+      />
       <input
         type="datetime-local"
         value={draft.startedAt}
-        onChange={(event) =>
-          setDraft({ ...draft, startedAt: event.target.value })
-        }
+        onChange={(e) => setDraft({ ...draft, startedAt: e.target.value })}
         className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600"
       />
       <input
         type="datetime-local"
         value={draft.endedAt}
-        onChange={(event) =>
-          setDraft({ ...draft, endedAt: event.target.value })
-        }
+        onChange={(e) => setDraft({ ...draft, endedAt: e.target.value })}
         className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600"
       />
       <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
         <input
           type="checkbox"
           checked={draft.billable}
-          onChange={(event) =>
-            setDraft({ ...draft, billable: event.target.checked })
-          }
+          onChange={(e) => setDraft({ ...draft, billable: e.target.checked })}
         />
         Billable
       </label>
       {!compact && (
         <input
           value={draft.notes}
-          onChange={(event) =>
-            setDraft({ ...draft, notes: event.target.value })
-          }
-          placeholder="Notes"
+          onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
+          placeholder="Notes (optional)"
           className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600 lg:col-span-5"
         />
+      )}
+    </div>
+  )
+}
+
+function ProjectPicker({
+  projects,
+  value,
+  onChange,
+  onCreate,
+  disabled = false,
+}: {
+  projects: { id: string; name: string; color: string }[]
+  value: string
+  onChange: (id: string) => void
+  onCreate: (name: string, color: string) => Promise<void>
+  disabled?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newColor, setNewColor] = useState('#2563eb')
+  const [createPending, setCreatePending] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+        setCreating(false)
+        setSearch('')
+      }
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [])
+
+  const selected = projects.find((p) => p.id === value)
+  const filtered = projects.filter((p) =>
+    p.name.toLowerCase().includes(search.toLowerCase()),
+  )
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newName.trim()) return
+    setCreatePending(true)
+    try {
+      await onCreate(newName.trim(), newColor)
+      setNewName('')
+      setNewColor('#2563eb')
+      setCreating(false)
+      setOpen(false)
+    } finally {
+      setCreatePending(false)
+    }
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen((o) => !o)}
+        className="flex h-10 w-full items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+      >
+        {selected ? (
+          <>
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: selected.color }}
+            />
+            <span className="flex-1 truncate text-left">{selected.name}</span>
+          </>
+        ) : (
+          <span className="flex-1 text-left text-slate-400">No project</span>
+        )}
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-[calc(100%+4px)] z-50 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+          <div className="border-b border-slate-100 p-2">
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search projects…"
+              className="h-8 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-teal-500"
+            />
+          </div>
+          <div className="max-h-48 overflow-y-auto py-1">
+            {filtered.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-slate-400">
+                No projects found
+              </p>
+            ) : (
+              filtered.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(p.id)
+                    setOpen(false)
+                    setSearch('')
+                  }}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-slate-50 ${
+                    p.id === value
+                      ? 'font-semibold text-slate-950'
+                      : 'text-slate-700'
+                  }`}
+                >
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: p.color }}
+                  />
+                  <span className="flex-1 truncate text-left">{p.name}</span>
+                  {p.id === value && (
+                    <Check className="h-3.5 w-3.5 text-teal-600" />
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+          <div className="border-t border-slate-100 p-2">
+            {creating ? (
+              <form onSubmit={handleCreate} className="grid gap-2">
+                <div className="flex gap-2">
+                  <input
+                    autoFocus
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Project name"
+                    className="h-8 flex-1 rounded-lg border border-slate-200 px-2 text-sm outline-none focus:border-teal-500"
+                  />
+                  <input
+                    type="color"
+                    value={newColor}
+                    onChange={(e) => setNewColor(e.target.value)}
+                    title="Pick a color"
+                    className="h-8 w-10 cursor-pointer rounded-lg border border-slate-200 p-0.5"
+                  />
+                </div>
+                <div className="flex gap-1.5">
+                  <button
+                    type="submit"
+                    disabled={createPending || !newName.trim()}
+                    className="flex-1 rounded-lg bg-teal-700 py-1.5 text-xs font-bold text-white hover:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400"
+                  >
+                    {createPending ? 'Creating…' : 'Create'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCreating(false)
+                      setNewName('')
+                    }}
+                    className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCreating(true)}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-50"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                New project
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TagPicker({
+  tags,
+  value,
+  onChange,
+  onCreate,
+  disabled = false,
+}: {
+  tags: { id: string; name: string; color: string }[]
+  value: string[]
+  onChange: (ids: string[]) => void
+  onCreate: (name: string, color: string) => Promise<void>
+  disabled?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newColor, setNewColor] = useState('#14b8a6')
+  const [createPending, setCreatePending] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+        setCreating(false)
+        setSearch('')
+      }
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [])
+
+  const selected = tags.filter((t) => value.includes(t.id))
+  const filtered = tags.filter((t) =>
+    t.name.toLowerCase().includes(search.toLowerCase()),
+  )
+
+  function toggleTag(id: string) {
+    onChange(
+      value.includes(id) ? value.filter((v) => v !== id) : [...value, id],
+    )
+  }
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newName.trim()) return
+    setCreatePending(true)
+    try {
+      await onCreate(newName.trim(), newColor)
+      setNewName('')
+      setNewColor('#14b8a6')
+      setCreating(false)
+    } finally {
+      setCreatePending(false)
+    }
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen((o) => !o)}
+        className="flex h-10 w-full items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+      >
+        <div className="flex flex-1 items-center gap-1 overflow-hidden">
+          {selected.length > 0 ? (
+            selected.slice(0, 2).map((t) => (
+              <span
+                key={t.id}
+                className="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold"
+                style={{ backgroundColor: t.color + '22', color: t.color }}
+              >
+                {t.name}
+              </span>
+            ))
+          ) : (
+            <span className="text-slate-400">No tags</span>
+          )}
+          {selected.length > 2 && (
+            <span className="text-xs text-slate-400">
+              +{selected.length - 2}
+            </span>
+          )}
+        </div>
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-[calc(100%+4px)] z-50 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+          <div className="border-b border-slate-100 p-2">
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search tags…"
+              className="h-8 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-teal-500"
+            />
+          </div>
+          <div className="max-h-48 overflow-y-auto py-1">
+            {filtered.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-slate-400">No tags found</p>
+            ) : (
+              filtered.map((t) => {
+                const checked = value.includes(t.id)
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => toggleTag(t.id)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-slate-50"
+                  >
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: t.color }}
+                    />
+                    <span
+                      className={`flex-1 truncate text-left ${
+                        checked
+                          ? 'font-semibold text-slate-950'
+                          : 'text-slate-700'
+                      }`}
+                    >
+                      {t.name}
+                    </span>
+                    {checked && <Check className="h-3.5 w-3.5 text-teal-600" />}
+                  </button>
+                )
+              })
+            )}
+          </div>
+          <div className="border-t border-slate-100 p-2">
+            {creating ? (
+              <form onSubmit={handleCreate} className="grid gap-2">
+                <div className="flex gap-2">
+                  <input
+                    autoFocus
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Tag name"
+                    className="h-8 flex-1 rounded-lg border border-slate-200 px-2 text-sm outline-none focus:border-teal-500"
+                  />
+                  <input
+                    type="color"
+                    value={newColor}
+                    onChange={(e) => setNewColor(e.target.value)}
+                    title="Pick a color"
+                    className="h-8 w-10 cursor-pointer rounded-lg border border-slate-200 p-0.5"
+                  />
+                </div>
+                <div className="flex gap-1.5">
+                  <button
+                    type="submit"
+                    disabled={createPending || !newName.trim()}
+                    className="flex-1 rounded-lg bg-teal-700 py-1.5 text-xs font-bold text-white hover:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400"
+                  >
+                    {createPending ? 'Creating…' : 'Create'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCreating(false)
+                      setNewName('')
+                    }}
+                    className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCreating(true)}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-50"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                New tag
+              </button>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )

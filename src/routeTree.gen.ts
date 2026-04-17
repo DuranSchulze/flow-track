@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoungeRouteImport } from './routes/lounge'
+import { Route as DemoPaymentRouteImport } from './routes/demo-payment'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthIndexRouteImport } from './routes/auth/index'
@@ -26,6 +27,11 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 const LoungeRoute = LoungeRouteImport.update({
   id: '/lounge',
   path: '/lounge',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemoPaymentRoute = DemoPaymentRouteImport.update({
+  id: '/demo-payment',
+  path: '/demo-payment',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -92,6 +98,7 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
+  '/demo-payment': typeof DemoPaymentRoute
   '/lounge': typeof LoungeRoute
   '/app/profile': typeof AppProfileRoute
   '/auth/': typeof AuthIndexRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
+  '/demo-payment': typeof DemoPaymentRoute
   '/lounge': typeof LoungeRoute
   '/app/profile': typeof AppProfileRoute
   '/auth': typeof AuthIndexRoute
@@ -123,6 +131,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/app': typeof AppRouteWithChildren
+  '/demo-payment': typeof DemoPaymentRoute
   '/lounge': typeof LoungeRoute
   '/app/profile': typeof AppProfileRoute
   '/auth/': typeof AuthIndexRoute
@@ -140,6 +149,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/app'
+    | '/demo-payment'
     | '/lounge'
     | '/app/profile'
     | '/auth/'
@@ -155,6 +165,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/app'
+    | '/demo-payment'
     | '/lounge'
     | '/app/profile'
     | '/auth'
@@ -170,6 +181,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/app'
+    | '/demo-payment'
     | '/lounge'
     | '/app/profile'
     | '/auth/'
@@ -186,6 +198,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
+  DemoPaymentRoute: typeof DemoPaymentRoute
   LoungeRoute: typeof LoungeRoute
   AuthIndexRoute: typeof AuthIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -198,6 +211,13 @@ declare module '@tanstack/react-router' {
       path: '/lounge'
       fullPath: '/lounge'
       preLoaderRoute: typeof LoungeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demo-payment': {
+      id: '/demo-payment'
+      path: '/demo-payment'
+      fullPath: '/demo-payment'
+      preLoaderRoute: typeof DemoPaymentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app': {
@@ -314,6 +334,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
+  DemoPaymentRoute: DemoPaymentRoute,
   LoungeRoute: LoungeRoute,
   AuthIndexRoute: AuthIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,

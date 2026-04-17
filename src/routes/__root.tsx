@@ -4,6 +4,7 @@ import {
   createRootRouteWithContext,
 } from '@tanstack/react-router'
 import { GooeyToaster } from 'goey-toast'
+import 'goey-toast/styles.css'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 

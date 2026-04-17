@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useRouter } from '@tanstack/react-router'
-import { Pencil, Plus, Trash2, UserPlus, X } from 'lucide-react'
+import { KeyRound, Pencil, Plus, Trash2, UserPlus, X } from 'lucide-react'
 import { gooeyToast } from 'goey-toast'
+import { authClient } from '#/lib/auth-client'
 import {
   archiveProjectFn,
   archiveTagFn,
@@ -91,7 +92,12 @@ function IconBtn({
       ? 'text-red-500 hover:text-red-700'
       : 'text-slate-400 hover:text-slate-700'
   return (
-    <button type="button" onClick={onClick} title={title} className={`p-1 ${cls}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={`p-1 ${cls}`}
+    >
       {children}
     </button>
   )
@@ -119,19 +125,31 @@ export function ProfileScreen({ state }: { state: TrackerState }) {
   const member = state.members.find((m) => m.id === state.currentMemberId)!
   const department = state.departments.find((d) => d.id === member.departmentId)
   const cohorts = state.cohorts.filter((c) => member.cohortIds.includes(c.id))
+  const roleColor =
+    state.roles.find((r) => r.id === member.workspaceRoleId)?.color ?? '#94a3b8'
 
+  // ── Edit profile state ──
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(member.name)
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [contactNumber, setContactNumber] = useState('')
-  const [pending, setPending] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState(member.image ?? '')
+  const [savePending, setSavePending] = useState(false)
 
   async function handleSave(event: React.FormEvent) {
     event.preventDefault()
-    setPending(true)
+    setSavePending(true)
     try {
-      await updateProfileFn({ data: { name, firstName, lastName, contactNumber: contactNumber || undefined } })
+      await updateProfileFn({
+        data: {
+          name,
+          firstName,
+          lastName,
+          contactNumber: contactNumber || undefined,
+          avatarUrl,
+        },
+      })
       await router.invalidate()
       gooeyToast.success('Profile updated')
       setEditing(false)
@@ -140,106 +158,288 @@ export function ProfileScreen({ state }: { state: TrackerState }) {
         description: err instanceof Error ? err.message : 'Please try again.',
       })
     } finally {
-      setPending(false)
+      setSavePending(false)
     }
   }
 
-  return (
-    <Page title="Profile" eyebrow="Account">
-      <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="grid h-16 w-16 place-items-center rounded-lg bg-slate-950 text-xl font-bold text-white">
-              {member.name.charAt(0)}
-            </div>
-            <div>
-              <h2 className="m-0 text-xl font-bold text-slate-950">{member.name}</h2>
-              <p className="m-0 mt-1 text-sm text-slate-500">{member.email}</p>
-            </div>
-          </div>
-        </section>
+  // ── Change password state ──
+  const [pwDialog, setPwDialog] = useState(false)
+  const [currentPw, setCurrentPw] = useState('')
+  const [newPw, setNewPw] = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
+  const [pwPending, setPwPending] = useState(false)
 
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          {editing ? (
-            <form onSubmit={handleSave} className="grid gap-3">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
-                  Display name
-                  <input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    className="h-9 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600"
-                  />
-                </label>
-                <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
-                  Contact number
-                  <input
-                    value={contactNumber}
-                    onChange={(e) => setContactNumber(e.target.value)}
-                    placeholder="Optional"
-                    className="h-9 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600"
-                  />
-                </label>
-                <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
-                  First name
-                  <input
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    required
-                    className="h-9 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600"
-                  />
-                </label>
-                <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
-                  Last name
-                  <input
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    required
-                    className="h-9 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600"
-                  />
-                </label>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  disabled={pending}
-                  className="h-9 rounded-lg bg-teal-700 px-4 text-sm font-bold text-white transition-colors hover:bg-teal-800 disabled:bg-slate-300"
-                >
-                  {pending ? 'Saving…' : 'Save'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditing(false)}
-                  className="h-9 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          ) : (
-            <>
-              <dl className="grid gap-4 sm:grid-cols-2">
-                <Info label="Role" value={member.roleName} />
-                <Info label="Status" value={member.status} />
-                <Info label="Department" value={department?.name || 'Unassigned'} />
-                <Info
-                  label="Groups / cohorts"
-                  value={cohorts.map((c) => c.name).join(', ') || 'None'}
+  async function handleChangePassword(event: React.FormEvent) {
+    event.preventDefault()
+    if (newPw !== confirmPw) {
+      gooeyToast.error('Passwords do not match', {
+        description: 'New password and confirmation must be identical.',
+      })
+      return
+    }
+    if (newPw.length < 8) {
+      gooeyToast.error('Password too short', {
+        description: 'New password must be at least 8 characters.',
+      })
+      return
+    }
+    setPwPending(true)
+    try {
+      const result = await authClient.changePassword({
+        currentPassword: currentPw,
+        newPassword: newPw,
+        revokeOtherSessions: false,
+      })
+      if (result.error) {
+        gooeyToast.error('Could not change password', {
+          description: result.error.message ?? 'Please try again.',
+        })
+        return
+      }
+      gooeyToast.success('Password changed successfully')
+      setCurrentPw('')
+      setNewPw('')
+      setConfirmPw('')
+      setPwDialog(false)
+    } catch {
+      gooeyToast.error('Something went wrong', {
+        description: 'Please try again.',
+      })
+    } finally {
+      setPwPending(false)
+    }
+  }
+
+  const initials = member.name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+
+  return (
+    <Page title="My Profile" eyebrow="Account">
+      <div className="flex justify-center">
+        <div className="w-full max-w-lg space-y-4">
+          {/* ── Avatar + identity card ── */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm text-center">
+            {/* Avatar */}
+            <div className="flex justify-center mb-4">
+              {member.image ? (
+                <img
+                  src={member.image}
+                  alt={member.name}
+                  className="h-24 w-24 rounded-full object-cover ring-4 ring-slate-100"
                 />
-              </dl>
+              ) : (
+                <div
+                  className="h-24 w-24 rounded-full flex items-center justify-center text-2xl font-bold text-white ring-4 ring-slate-100"
+                  style={{ backgroundColor: roleColor }}
+                >
+                  {initials}
+                </div>
+              )}
+            </div>
+
+            {/* Name + email */}
+            <h2 className="m-0 text-2xl font-bold text-slate-950">
+              {member.name}
+            </h2>
+            <p className="m-0 mt-1 text-sm text-slate-500">{member.email}</p>
+
+            {/* Role + status badges */}
+            <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold text-white"
+                style={{ backgroundColor: roleColor }}
+              >
+                {member.roleName}
+              </span>
+              <MemberStatusBadge status={member.status} />
+            </div>
+          </section>
+
+          {/* ── Info card ── */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <dl className="grid grid-cols-2 gap-4">
+              <Info
+                label="Department"
+                value={department?.name || 'Unassigned'}
+              />
+              <Info
+                label="Groups / cohorts"
+                value={cohorts.map((c) => c.name).join(', ') || 'None'}
+              />
+            </dl>
+
+            <div className="mt-5 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => setEditing(true)}
-                className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
               >
                 <Pencil className="h-3.5 w-3.5" />
                 Edit profile
               </button>
-            </>
+              <button
+                type="button"
+                onClick={() => setPwDialog(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                <KeyRound className="h-3.5 w-3.5" />
+                Change password
+              </button>
+            </div>
+          </section>
+
+          {/* ── Edit profile inline form ── */}
+          {editing && (
+            <section className="rounded-2xl border border-teal-200 bg-teal-50 p-6 shadow-sm">
+              <h3 className="m-0 mb-4 text-base font-bold text-slate-950">
+                Edit profile
+              </h3>
+              <form onSubmit={handleSave} className="grid gap-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
+                    Display name
+                    <input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                      className="h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-teal-600"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
+                    Contact number
+                    <input
+                      value={contactNumber}
+                      onChange={(e) => setContactNumber(e.target.value)}
+                      placeholder="Optional"
+                      className="h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-teal-600"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
+                    First name
+                    <input
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      required
+                      className="h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-teal-600"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
+                    Last name
+                    <input
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      required
+                      className="h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-teal-600"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-xs font-semibold text-slate-700 sm:col-span-2">
+                    Profile picture URL
+                    <input
+                      value={avatarUrl}
+                      onChange={(e) => setAvatarUrl(e.target.value)}
+                      placeholder="https://example.com/photo.jpg (optional)"
+                      type="url"
+                      className="h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-teal-600"
+                    />
+                  </label>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="submit"
+                    disabled={savePending}
+                    className="h-9 rounded-lg bg-teal-700 px-4 text-sm font-bold text-white transition-colors hover:bg-teal-800 disabled:bg-slate-300"
+                  >
+                    {savePending ? 'Saving…' : 'Save changes'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(false)}
+                    className="h-9 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </section>
           )}
-        </section>
+        </div>
       </div>
+
+      {/* ── Change password dialog ── */}
+      {pwDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setPwDialog(false)}
+          />
+          <div className="relative w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+            <div className="mb-5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <KeyRound className="h-5 w-5 text-slate-700" />
+                <h3 className="m-0 text-base font-bold text-slate-950">
+                  Change password
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPwDialog(false)}
+                className="grid h-7 w-7 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleChangePassword} className="grid gap-3">
+              <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
+                Current password
+                <input
+                  type="password"
+                  value={currentPw}
+                  onChange={(e) => setCurrentPw(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  className="h-9 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600"
+                />
+              </label>
+              <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
+                New password
+                <input
+                  type="password"
+                  value={newPw}
+                  onChange={(e) => setNewPw(e.target.value)}
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  className="h-9 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600"
+                />
+              </label>
+              <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
+                Confirm new password
+                <input
+                  type="password"
+                  value={confirmPw}
+                  onChange={(e) => setConfirmPw(e.target.value)}
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  className="h-9 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={pwPending}
+                className="mt-1 h-9 w-full rounded-lg bg-slate-950 text-sm font-bold text-white transition-colors hover:bg-slate-800 disabled:bg-slate-300"
+              >
+                {pwPending ? 'Updating…' : 'Update password'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </Page>
   )
 }
@@ -248,13 +448,18 @@ export function ProfileScreen({ state }: { state: TrackerState }) {
 
 export function MembersScreen({ state }: { state: TrackerState }) {
   const router = useRouter()
-  const currentMember = state.members.find((m) => m.id === state.currentMemberId)!
+  const currentMember = state.members.find(
+    (m) => m.id === state.currentMemberId,
+  )!
   const canManage =
-    currentMember.permissionLevel === 'OWNER' || currentMember.permissionLevel === 'ADMIN'
+    currentMember.permissionLevel === 'OWNER' ||
+    currentMember.permissionLevel === 'ADMIN'
 
   const [showForm, setShowForm] = useState(false)
   const [email, setEmail] = useState('')
-  const [workspaceRoleId, setWorkspaceRoleId] = useState(state.roles[0]?.id ?? '')
+  const [workspaceRoleId, setWorkspaceRoleId] = useState(
+    state.roles[0]?.id ?? '',
+  )
   const [departmentId, setDepartmentId] = useState('')
   const [pending, setPending] = useState(false)
 
@@ -263,7 +468,11 @@ export function MembersScreen({ state }: { state: TrackerState }) {
     setPending(true)
     try {
       await createWorkspaceMemberFn({
-        data: { email, workspaceRoleId, departmentId: departmentId || undefined },
+        data: {
+          email,
+          workspaceRoleId,
+          departmentId: departmentId || undefined,
+        },
       })
       await router.invalidate()
       gooeyToast.success('Member added', {
@@ -287,9 +496,12 @@ export function MembersScreen({ state }: { state: TrackerState }) {
       <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 p-4">
           <div>
-            <h2 className="m-0 text-lg font-bold text-slate-950">Managed user list</h2>
+            <h2 className="m-0 text-lg font-bold text-slate-950">
+              Managed user list
+            </h2>
             <p className="m-0 mt-1 text-sm text-slate-500">
-              Employees join this private workspace when their account email matches this list.
+              Employees join this private workspace when their account email
+              matches this list.
             </p>
           </div>
           {canManage && (
@@ -298,7 +510,11 @@ export function MembersScreen({ state }: { state: TrackerState }) {
               onClick={() => setShowForm((prev) => !prev)}
               className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-slate-800"
             >
-              {showForm ? <X className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+              {showForm ? (
+                <X className="h-4 w-4" />
+              ) : (
+                <UserPlus className="h-4 w-4" />
+              )}
               {showForm ? 'Cancel' : 'Add member'}
             </button>
           )}
@@ -442,7 +658,9 @@ function MemberRow({
     try {
       await setMemberStatusFn({ data: { memberId: member.id, status: next } })
       await router.invalidate()
-      gooeyToast.success(`Member ${next === 'DISABLED' ? 'disabled' : 'reactivated'}`)
+      gooeyToast.success(
+        `Member ${next === 'DISABLED' ? 'disabled' : 'reactivated'}`,
+      )
     } catch (err) {
       gooeyToast.error('Could not update status', {
         description: err instanceof Error ? err.message : 'Please try again.',
@@ -496,7 +714,10 @@ function MemberRow({
         <td className="px-4 py-3">
           <div className="flex flex-wrap gap-1">
             {state.cohorts.map((c) => (
-              <label key={c.id} className="flex cursor-pointer items-center gap-1 text-xs">
+              <label
+                key={c.id}
+                className="flex cursor-pointer items-center gap-1 text-xs"
+              >
                 <input
                   type="checkbox"
                   checked={cohortIds.includes(c.id)}
@@ -546,7 +767,8 @@ function MemberRow({
             className="inline-block h-2.5 w-2.5 rounded-full"
             style={{
               backgroundColor:
-                state.roles.find((r) => r.id === member.workspaceRoleId)?.color ?? '#94a3b8',
+                state.roles.find((r) => r.id === member.workspaceRoleId)
+                  ?.color ?? '#94a3b8',
             }}
           />
           {member.roleName}
@@ -589,9 +811,12 @@ function MemberRow({
 // ─── CatalogsScreen ───────────────────────────────────────────────────────────
 
 export function CatalogsScreen({ state }: { state: TrackerState }) {
-  const currentMember = state.members.find((m) => m.id === state.currentMemberId)!
+  const currentMember = state.members.find(
+    (m) => m.id === state.currentMemberId,
+  )!
   const canManage =
-    currentMember.permissionLevel === 'OWNER' || currentMember.permissionLevel === 'ADMIN'
+    currentMember.permissionLevel === 'OWNER' ||
+    currentMember.permissionLevel === 'ADMIN'
 
   return (
     <Page title="Catalogs" eyebrow="Controlled tagging">
@@ -613,7 +838,13 @@ const PERMISSION_LABELS: Record<string, string> = {
   EMPLOYEE: 'Employee',
 }
 
-function RolesManager({ state, canManage }: { state: TrackerState; canManage: boolean }) {
+function RolesManager({
+  state,
+  canManage,
+}: {
+  state: TrackerState
+  canManage: boolean
+}) {
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
@@ -629,7 +860,9 @@ function RolesManager({ state, canManage }: { state: TrackerState; canManage: bo
     try {
       await createWorkspaceRoleFn({ data: { name, permissionLevel, color } })
       await router.invalidate()
-      gooeyToast.success('Role created', { description: `"${name}" is now available.` })
+      gooeyToast.success('Role created', {
+        description: `"${name}" is now available.`,
+      })
       setName('')
       setPermissionLevel('EMPLOYEE')
       setColor('#6366f1')
@@ -653,7 +886,11 @@ function RolesManager({ state, canManage }: { state: TrackerState; canManage: bo
             onClick={() => setShowForm((p) => !p)}
             className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-800"
           >
-            {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+            {showForm ? (
+              <X className="h-3.5 w-3.5" />
+            ) : (
+              <Plus className="h-3.5 w-3.5" />
+            )}
             {showForm ? 'Cancel' : 'New role'}
           </button>
         ) : undefined
@@ -672,7 +909,9 @@ function RolesManager({ state, canManage }: { state: TrackerState; canManage: bo
             <select
               value={permissionLevel}
               onChange={(e) =>
-                setPermissionLevel(e.target.value as 'OWNER' | 'ADMIN' | 'MANAGER' | 'EMPLOYEE')
+                setPermissionLevel(
+                  e.target.value as 'OWNER' | 'ADMIN' | 'MANAGER' | 'EMPLOYEE',
+                )
               }
               className="h-9 flex-1 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600"
             >
@@ -708,8 +947,12 @@ function RolesManager({ state, canManage }: { state: TrackerState; canManage: bo
               className="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"
               style={{ backgroundColor: role.color }}
             />
-            <span className="text-sm font-semibold text-slate-700">{role.name}</span>
-            <span className="ml-1 text-xs text-slate-400">{PERMISSION_LABELS[role.permissionLevel]}</span>
+            <span className="text-sm font-semibold text-slate-700">
+              {role.name}
+            </span>
+            <span className="ml-1 text-xs text-slate-400">
+              {PERMISSION_LABELS[role.permissionLevel]}
+            </span>
           </div>
         ))}
       </div>
@@ -717,7 +960,13 @@ function RolesManager({ state, canManage }: { state: TrackerState; canManage: bo
   )
 }
 
-function ProjectsManager({ state, canManage }: { state: TrackerState; canManage: boolean }) {
+function ProjectsManager({
+  state,
+  canManage,
+}: {
+  state: TrackerState
+  canManage: boolean
+}) {
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
@@ -769,7 +1018,11 @@ function ProjectsManager({ state, canManage }: { state: TrackerState; canManage:
             onClick={() => setShowForm((p) => !p)}
             className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-800"
           >
-            {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+            {showForm ? (
+              <X className="h-3.5 w-3.5" />
+            ) : (
+              <Plus className="h-3.5 w-3.5" />
+            )}
             {showForm ? 'Cancel' : 'New project'}
           </button>
         ) : undefined
@@ -810,7 +1063,9 @@ function ProjectsManager({ state, canManage }: { state: TrackerState; canManage:
               className="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"
               style={{ backgroundColor: p.color }}
             />
-            <span className="text-sm font-semibold text-slate-700">{p.name}</span>
+            <span className="text-sm font-semibold text-slate-700">
+              {p.name}
+            </span>
             {canManage && (
               <IconBtn
                 onClick={() => handleArchive(p.id, p.name)}
@@ -829,7 +1084,13 @@ function ProjectsManager({ state, canManage }: { state: TrackerState; canManage:
   )
 }
 
-function TagsManager({ state, canManage }: { state: TrackerState; canManage: boolean }) {
+function TagsManager({
+  state,
+  canManage,
+}: {
+  state: TrackerState
+  canManage: boolean
+}) {
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
@@ -881,7 +1142,11 @@ function TagsManager({ state, canManage }: { state: TrackerState; canManage: boo
             onClick={() => setShowForm((p) => !p)}
             className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-800"
           >
-            {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+            {showForm ? (
+              <X className="h-3.5 w-3.5" />
+            ) : (
+              <Plus className="h-3.5 w-3.5" />
+            )}
             {showForm ? 'Cancel' : 'New tag'}
           </button>
         ) : undefined
@@ -922,7 +1187,9 @@ function TagsManager({ state, canManage }: { state: TrackerState; canManage: boo
               className="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"
               style={{ backgroundColor: t.color }}
             />
-            <span className="text-sm font-semibold text-slate-700">{t.name}</span>
+            <span className="text-sm font-semibold text-slate-700">
+              {t.name}
+            </span>
             {canManage && (
               <IconBtn
                 onClick={() => handleArchive(t.id, t.name)}
@@ -941,7 +1208,13 @@ function TagsManager({ state, canManage }: { state: TrackerState; canManage: boo
   )
 }
 
-function DepartmentsManager({ state, canManage }: { state: TrackerState; canManage: boolean }) {
+function DepartmentsManager({
+  state,
+  canManage,
+}: {
+  state: TrackerState
+  canManage: boolean
+}) {
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
@@ -954,7 +1227,9 @@ function DepartmentsManager({ state, canManage }: { state: TrackerState; canMana
     event.preventDefault()
     setPending(true)
     try {
-      await createDepartmentFn({ data: { name, description: description || undefined, color } })
+      await createDepartmentFn({
+        data: { name, description: description || undefined, color },
+      })
       await router.invalidate()
       gooeyToast.success('Department created')
       setName('')
@@ -995,7 +1270,11 @@ function DepartmentsManager({ state, canManage }: { state: TrackerState; canMana
             onClick={() => setShowForm((p) => !p)}
             className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-800"
           >
-            {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+            {showForm ? (
+              <X className="h-3.5 w-3.5" />
+            ) : (
+              <Plus className="h-3.5 w-3.5" />
+            )}
             {showForm ? 'Cancel' : 'New department'}
           </button>
         ) : undefined
@@ -1040,7 +1319,9 @@ function DepartmentsManager({ state, canManage }: { state: TrackerState; canMana
             key={dept.id}
             className="group flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2"
           >
-            <span className="text-sm font-semibold text-slate-700">{dept.name}</span>
+            <span className="text-sm font-semibold text-slate-700">
+              {dept.name}
+            </span>
             {canManage && (
               <IconBtn
                 onClick={() => handleDelete(dept.id, dept.name)}
@@ -1059,7 +1340,13 @@ function DepartmentsManager({ state, canManage }: { state: TrackerState; canMana
   )
 }
 
-function CohortsManager({ state, canManage }: { state: TrackerState; canManage: boolean }) {
+function CohortsManager({
+  state,
+  canManage,
+}: {
+  state: TrackerState
+  canManage: boolean
+}) {
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
@@ -1109,7 +1396,11 @@ function CohortsManager({ state, canManage }: { state: TrackerState; canManage: 
             onClick={() => setShowForm((p) => !p)}
             className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-800"
           >
-            {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+            {showForm ? (
+              <X className="h-3.5 w-3.5" />
+            ) : (
+              <Plus className="h-3.5 w-3.5" />
+            )}
             {showForm ? 'Cancel' : 'New cohort'}
           </button>
         ) : undefined
@@ -1139,7 +1430,9 @@ function CohortsManager({ state, canManage }: { state: TrackerState; canManage: 
             key={cohort.id}
             className="group flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2"
           >
-            <span className="text-sm font-semibold text-slate-700">{cohort.name}</span>
+            <span className="text-sm font-semibold text-slate-700">
+              {cohort.name}
+            </span>
             {canManage && (
               <IconBtn
                 onClick={() => handleDelete(cohort.id, cohort.name)}
@@ -1162,7 +1455,9 @@ function CohortsManager({ state, canManage }: { state: TrackerState; canManage: 
 
 export function SettingsScreen({ state }: { state: TrackerState }) {
   const router = useRouter()
-  const currentMember = state.members.find((m) => m.id === state.currentMemberId)!
+  const currentMember = state.members.find(
+    (m) => m.id === state.currentMemberId,
+  )!
   const isOwner = currentMember.permissionLevel === 'OWNER'
 
   const [editing, setEditing] = useState(false)
@@ -1221,7 +1516,11 @@ export function SettingsScreen({ state }: { state: TrackerState }) {
               </button>
               <button
                 type="button"
-                onClick={() => { setEditing(false); setName(state.workspace.name); setTimezone(state.workspace.timezone) }}
+                onClick={() => {
+                  setEditing(false)
+                  setName(state.workspace.name)
+                  setTimezone(state.workspace.timezone)
+                }}
                 className="h-9 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 Cancel
@@ -1233,7 +1532,10 @@ export function SettingsScreen({ state }: { state: TrackerState }) {
             <dl className="grid gap-4 sm:grid-cols-3">
               <Info label="Workspace" value={state.workspace.name} />
               <Info label="Timezone" value={state.workspace.timezone} />
-              <Info label="Role model" value="Owner / Admin / Manager / Employee" />
+              <Info
+                label="Role model"
+                value="Owner / Admin / Manager / Employee"
+              />
             </dl>
             {isOwner && (
               <button

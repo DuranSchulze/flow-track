@@ -173,6 +173,7 @@ export async function getTrackerState(): Promise<TrackerState> {
         id: member.id,
         name: member.user?.name ?? member.email,
         email: member.email,
+        image: member.user?.image ?? null,
         workspaceRoleId: member.workspaceRoleId ?? '',
         roleName: member.workspaceRole?.name ?? 'No role',
         permissionLevel: member.workspaceRole?.permissionLevel ?? 'EMPLOYEE',
@@ -457,7 +458,6 @@ const idSchema = z.object({ id: z.string().min(1) })
 
 export async function createProject(data: z.infer<typeof createProjectSchema>) {
   const access = await requireWorkspaceAccess()
-  assertOwnerOrAdmin(access)
 
   const existing = await prisma.project.findFirst({
     where: { workspaceId: access.workspace.id, name: { equals: data.name, mode: 'insensitive' } },
@@ -504,7 +504,6 @@ const updateTagSchema = z.object({
 
 export async function createTag(data: z.infer<typeof createTagSchema>) {
   const access = await requireWorkspaceAccess()
-  assertOwnerOrAdmin(access)
 
   const existing = await prisma.tag.findFirst({
     where: { workspaceId: access.workspace.id, name: { equals: data.name, mode: 'insensitive' } },
@@ -718,6 +717,7 @@ const updateProfileSchema = z.object({
   firstName: z.string().trim().min(1).max(50),
   lastName: z.string().trim().min(1).max(50),
   contactNumber: z.string().trim().max(50).optional(),
+  avatarUrl: z.string().url().max(500).optional().or(z.literal('')),
 })
 
 export async function updateProfile(data: z.infer<typeof updateProfileSchema>) {
@@ -726,7 +726,7 @@ export async function updateProfile(data: z.infer<typeof updateProfileSchema>) {
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: access.user.id },
-      data: { name: data.name },
+      data: { name: data.name, image: data.avatarUrl || null },
     })
 
     await tx.userProfile.upsert({
