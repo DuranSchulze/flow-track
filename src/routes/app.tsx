@@ -25,6 +25,7 @@ export const Route = createFileRoute('/app')({
           name: access.user.name,
           email: access.user.email,
         },
+        permissionLevel: access.member.workspaceRole?.permissionLevel ?? 'EMPLOYEE',
       }
     } catch {
       throw redirect({ to: '/lounge' })
@@ -35,5 +36,5 @@ export const Route = createFileRoute('/app')({
 
 function AppRoute() {
   const data = Route.useLoaderData()
-  return <AppShell workspace={data.workspace} user={data.user} />
+  return <AppShell workspace={data.workspace} user={data.user} permissionLevel={data.permissionLevel} />
 }

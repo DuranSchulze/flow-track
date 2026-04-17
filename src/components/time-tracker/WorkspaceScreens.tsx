@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { formatHours } from '#/lib/time-tracker/store'
 import { useRouter } from '@tanstack/react-router'
-import { Pencil, Plus, Trash2, UserPlus, X } from 'lucide-react'
+import { Download, FileSpreadsheet, FileText, Pencil, Plus, Trash2, UserPlus, X } from 'lucide-react'
 import { gooeyToast } from 'goey-toast'
 import {
   archiveProjectFn,
@@ -13,12 +14,13 @@ import {
   createWorkspaceRoleFn,
   deleteCohortFn,
   deleteDepartmentFn,
+  getWorkspaceReportFn,
   setMemberStatusFn,
   updateProfileFn,
   updateWorkspaceMemberFn,
   updateWorkspaceSettingsFn,
 } from '#/lib/server/tracker'
-import type { TrackerState } from '#/lib/time-tracker/types'
+import type { ReportRow, TrackerState } from '#/lib/time-tracker/types'
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -590,17 +592,18 @@ function MemberRow({
 
 export function CatalogsScreen({ state }: { state: TrackerState }) {
   const currentMember = state.members.find((m) => m.id === state.currentMemberId)!
-  const canManage =
-    currentMember.permissionLevel === 'OWNER' || currentMember.permissionLevel === 'ADMIN'
+  const level = currentMember.permissionLevel
+  const canManageAll = level === 'OWNER' || level === 'ADMIN'
+  const canManageCatalogs = canManageAll || level === 'CATALOG_MANAGER'
 
   return (
     <Page title="Catalogs" eyebrow="Controlled tagging">
       <div className="grid gap-4 lg:grid-cols-2">
-        <RolesManager state={state} canManage={canManage} />
-        <ProjectsManager state={state} canManage={canManage} />
-        <TagsManager state={state} canManage={canManage} />
-        <DepartmentsManager state={state} canManage={canManage} />
-        <CohortsManager state={state} canManage={canManage} />
+        <RolesManager state={state} canManage={canManageAll} />
+        <ProjectsManager state={state} canManage={canManageCatalogs} />
+        <TagsManager state={state} canManage={canManageCatalogs} />
+        <DepartmentsManager state={state} canManage={canManageAll} departmentTotals={state.departmentTotals} />
+        <CohortsManager state={state} canManage={canManageAll} />
       </div>
     </Page>
   )
@@ -609,6 +612,7 @@ export function CatalogsScreen({ state }: { state: TrackerState }) {
 const PERMISSION_LABELS: Record<string, string> = {
   OWNER: 'Owner',
   ADMIN: 'Admin',
+  CATALOG_MANAGER: 'Catalog Manager',
   MANAGER: 'Manager',
   EMPLOYEE: 'Employee',
 }
@@ -618,7 +622,7 @@ function RolesManager({ state, canManage }: { state: TrackerState; canManage: bo
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
   const [permissionLevel, setPermissionLevel] = useState<
-    'OWNER' | 'ADMIN' | 'MANAGER' | 'EMPLOYEE'
+    'OWNER' | 'ADMIN' | 'CATALOG_MANAGER' | 'MANAGER' | 'EMPLOYEE'
   >('EMPLOYEE')
   const [color, setColor] = useState('#6366f1')
   const [pending, setPending] = useState(false)
@@ -672,12 +676,15 @@ function RolesManager({ state, canManage }: { state: TrackerState; canManage: bo
             <select
               value={permissionLevel}
               onChange={(e) =>
-                setPermissionLevel(e.target.value as 'OWNER' | 'ADMIN' | 'MANAGER' | 'EMPLOYEE')
+                setPermissionLevel(
+                  e.target.value as 'OWNER' | 'ADMIN' | 'CATALOG_MANAGER' | 'MANAGER' | 'EMPLOYEE',
+                )
               }
               className="h-9 flex-1 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600"
             >
               <option value="EMPLOYEE">Employee (can track time)</option>
               <option value="MANAGER">Manager (can view team)</option>
+              <option value="CATALOG_MANAGER">Catalog Manager (can manage projects &amp; tags)</option>
               <option value="ADMIN">Admin (can manage workspace)</option>
               <option value="OWNER">Owner (full access)</option>
             </select>
@@ -941,7 +948,15 @@ function TagsManager({ state, canManage }: { state: TrackerState; canManage: boo
   )
 }
 
-function DepartmentsManager({ state, canManage }: { state: TrackerState; canManage: boolean }) {
+function DepartmentsManager({
+  state,
+  canManage,
+  departmentTotals,
+}: {
+  state: TrackerState
+  canManage: boolean
+  departmentTotals?: Record<string, number>
+}) {
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
@@ -1041,17 +1056,24 @@ function DepartmentsManager({ state, canManage }: { state: TrackerState; canMana
             className="group flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2"
           >
             <span className="text-sm font-semibold text-slate-700">{dept.name}</span>
-            {canManage && (
-              <IconBtn
-                onClick={() => handleDelete(dept.id, dept.name)}
-                title="Delete department"
-                variant="danger"
-              >
-                <Trash2
-                  className={`h-3.5 w-3.5 opacity-0 group-hover:opacity-100 ${deletingId === dept.id ? 'opacity-100' : ''}`}
-                />
-              </IconBtn>
-            )}
+            <div className="flex items-center gap-3">
+              {departmentTotals !== undefined && (
+                <span className="text-xs font-medium text-slate-400" title="Total tracked hours">
+                  {formatHours(departmentTotals[dept.id] ?? 0)}
+                </span>
+              )}
+              {canManage && (
+                <IconBtn
+                  onClick={() => handleDelete(dept.id, dept.name)}
+                  title="Delete department"
+                  variant="danger"
+                >
+                  <Trash2
+                    className={`h-3.5 w-3.5 opacity-0 group-hover:opacity-100 ${deletingId === dept.id ? 'opacity-100' : ''}`}
+                  />
+                </IconBtn>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -1155,6 +1177,304 @@ function CohortsManager({ state, canManage }: { state: TrackerState; canManage: 
         ))}
       </div>
     </SectionCard>
+  )
+}
+
+// ─── ReportScreen ─────────────────────────────────────────────────────────────
+
+type ViewMode = 'day' | 'week' | 'month'
+
+function getReportLabel(view: ViewMode, date: Date): string {
+  if (view === 'day') {
+    return date.toLocaleDateString('en-PH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  }
+  if (view === 'week') {
+    const start = new Date(date)
+    const day = start.getDay()
+    start.setDate(start.getDate() + (day === 0 ? -6 : 1 - day))
+    const end = new Date(start)
+    end.setDate(start.getDate() + 6)
+    return `${start.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}`
+  }
+  return date.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
+}
+
+function shiftDate(view: ViewMode, date: Date, direction: 1 | -1): Date {
+  const next = new Date(date)
+  if (view === 'day') next.setDate(next.getDate() + direction)
+  else if (view === 'week') next.setDate(next.getDate() + direction * 7)
+  else next.setMonth(next.getMonth() + direction)
+  return next
+}
+
+async function exportCSV(rows: ReportRow[], label: string) {
+  const { utils, writeFile } = await import('xlsx')
+  const ws = utils.json_to_sheet(rows.map(rowToFlat))
+  const wb = utils.book_new()
+  utils.book_append_sheet(wb, ws, 'Report')
+  writeFile(wb, `report-${label}.csv`, { bookType: 'csv' })
+}
+
+async function exportExcel(rows: ReportRow[], label: string) {
+  const { utils, writeFile } = await import('xlsx')
+  const headers = [['Date', 'Member', 'Department', 'Role', 'Task', 'Project', 'Tags', 'Hours', 'Billable', 'Notes']]
+  const data = rows.map(rowToArray)
+  const ws = utils.aoa_to_sheet([...headers, ...data])
+
+  // Column widths
+  ws['!cols'] = [
+    { wch: 12 }, { wch: 22 }, { wch: 18 }, { wch: 18 },
+    { wch: 35 }, { wch: 20 }, { wch: 25 }, { wch: 8 },
+    { wch: 10 }, { wch: 30 },
+  ]
+
+  const wb = utils.book_new()
+  utils.book_append_sheet(wb, ws, 'Report')
+  writeFile(wb, `report-${label}.xlsx`)
+}
+
+async function exportPDF(rows: ReportRow[], label: string) {
+  const { default: jsPDF } = await import('jspdf')
+  const { default: autoTable } = await import('jspdf-autotable')
+
+  const doc = new jsPDF({ orientation: 'landscape' })
+  doc.setFontSize(13)
+  doc.text(`Time Report — ${label}`, 14, 14)
+
+  autoTable(doc, {
+    startY: 22,
+    head: [['Date', 'Member', 'Department', 'Role', 'Task', 'Project', 'Tags', 'Hours', 'Billable', 'Notes']],
+    body: rows.map(rowToArray),
+    styles: { fontSize: 7, cellPadding: 2 },
+    headStyles: { fillColor: [15, 23, 42] },
+    columnStyles: {
+      0: { cellWidth: 18 },
+      1: { cellWidth: 26 },
+      2: { cellWidth: 22 },
+      3: { cellWidth: 22 },
+      4: { cellWidth: 38 },
+      5: { cellWidth: 22 },
+      6: { cellWidth: 28 },
+      7: { cellWidth: 14 },
+      8: { cellWidth: 14 },
+      9: { cellWidth: 'auto' },
+    },
+  })
+
+  doc.save(`report-${label}.pdf`)
+}
+
+function rowToFlat(r: ReportRow) {
+  return {
+    Date: r.date,
+    Member: r.memberName,
+    Department: r.department,
+    Role: r.role,
+    Task: r.task,
+    Project: r.project,
+    Tags: r.tags,
+    Hours: r.hours,
+    Billable: r.billable ? 'Yes' : 'No',
+    Notes: r.notes,
+  }
+}
+
+function rowToArray(r: ReportRow): (string | number)[] {
+  return [r.date, r.memberName, r.department, r.role, r.task, r.project, r.tags, r.hours, r.billable ? 'Yes' : 'No', r.notes]
+}
+
+export function ReportScreen(_: { state: TrackerState }) {
+  const [view, setView] = useState<ViewMode>('week')
+  const [date, setDate] = useState(() => new Date())
+  const [rows, setRows] = useState<ReportRow[] | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [exporting, setExporting] = useState<'csv' | 'xlsx' | 'pdf' | null>(null)
+
+  const label = getReportLabel(view, date)
+  const totalHours = rows ? rows.reduce((s, r) => s + r.hours, 0).toFixed(2) : null
+  const billableHours = rows ? rows.filter((r) => r.billable).reduce((s, r) => s + r.hours, 0).toFixed(2) : null
+
+  async function handleLoad() {
+    setLoading(true)
+    try {
+      const data = await getWorkspaceReportFn({ data: { view, date: date.toISOString() } })
+      setRows(data)
+    } catch (err) {
+      gooeyToast.error('Could not load report', {
+        description: err instanceof Error ? err.message : 'Please try again.',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleExport(format: 'csv' | 'xlsx' | 'pdf') {
+    if (!rows) return
+    setExporting(format)
+    try {
+      const slug = label.replace(/[^a-z0-9]+/gi, '-').toLowerCase()
+      if (format === 'csv') await exportCSV(rows, slug)
+      else if (format === 'xlsx') await exportExcel(rows, slug)
+      else await exportPDF(rows, slug)
+      gooeyToast.success(`Exported as ${format.toUpperCase()}`)
+    } catch (err) {
+      gooeyToast.error('Export failed', {
+        description: err instanceof Error ? err.message : 'Please try again.',
+      })
+    } finally {
+      setExporting(null)
+    }
+  }
+
+  return (
+    <Page title="Reports" eyebrow="Workspace time export">
+      {/* Controls */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* View selector */}
+        <div className="flex rounded-lg border border-slate-200 bg-white overflow-hidden">
+          {(['day', 'week', 'month'] as ViewMode[]).map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => { setView(v); setRows(null) }}
+              className={`px-4 py-2 text-sm font-semibold capitalize transition-colors ${
+                view === v
+                  ? 'bg-slate-950 text-white'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+
+        {/* Date navigation */}
+        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+          <button
+            type="button"
+            onClick={() => { setDate(shiftDate(view, date, -1)); setRows(null) }}
+            className="text-slate-500 hover:text-slate-950"
+          >
+            ‹
+          </button>
+          <span className="min-w-48 text-center text-sm font-semibold text-slate-700">{label}</span>
+          <button
+            type="button"
+            onClick={() => { setDate(shiftDate(view, date, 1)); setRows(null) }}
+            className="text-slate-500 hover:text-slate-950"
+          >
+            ›
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleLoad}
+          disabled={loading}
+          className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white hover:bg-teal-800 disabled:bg-slate-300"
+        >
+          {loading ? 'Loading…' : 'Load Report'}
+        </button>
+      </div>
+
+      {/* Summary + export buttons */}
+      {rows !== null && (
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <div className="flex gap-4 rounded-lg border border-slate-200 bg-white px-4 py-2.5">
+            <span className="text-sm text-slate-500">
+              Entries: <strong className="text-slate-900">{rows.length}</strong>
+            </span>
+            <span className="text-sm text-slate-500">
+              Total: <strong className="text-slate-900">{totalHours}h</strong>
+            </span>
+            <span className="text-sm text-slate-500">
+              Billable: <strong className="text-teal-700">{billableHours}h</strong>
+            </span>
+          </div>
+
+          <div className="ml-auto flex gap-2">
+            <button
+              type="button"
+              onClick={() => handleExport('csv')}
+              disabled={exporting !== null || rows.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {exporting === 'csv' ? 'Exporting…' : 'CSV'}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExport('xlsx')}
+              disabled={exporting !== null || rows.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              {exporting === 'xlsx' ? 'Exporting…' : 'Excel'}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExport('pdf')}
+              disabled={exporting !== null || rows.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              {exporting === 'pdf' ? 'Exporting…' : 'PDF'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Preview table */}
+      {rows !== null && rows.length === 0 && (
+        <p className="mt-8 text-center text-sm text-slate-400">No completed entries found for this period.</p>
+      )}
+
+      {rows !== null && rows.length > 0 && (
+        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Member</th>
+                <th className="px-4 py-3">Department</th>
+                <th className="px-4 py-3">Role</th>
+                <th className="px-4 py-3">Task</th>
+                <th className="px-4 py-3">Project</th>
+                <th className="px-4 py-3">Tags</th>
+                <th className="px-4 py-3 text-right">Hours</th>
+                <th className="px-4 py-3">Billable</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr
+                  key={i}
+                  className="border-t border-slate-100 hover:bg-slate-50"
+                >
+                  <td className="whitespace-nowrap px-4 py-2.5 text-slate-500">{row.date}</td>
+                  <td className="px-4 py-2.5 font-medium text-slate-800">{row.memberName}</td>
+                  <td className="px-4 py-2.5 text-slate-600">{row.department}</td>
+                  <td className="px-4 py-2.5 text-slate-600">{row.role}</td>
+                  <td className="max-w-xs px-4 py-2.5 text-slate-700">{row.task}</td>
+                  <td className="px-4 py-2.5 text-slate-600">{row.project}</td>
+                  <td className="px-4 py-2.5 text-slate-500">{row.tags || '—'}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-right font-mono font-semibold text-slate-800">
+                    {row.hours.toFixed(2)}h
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {row.billable ? (
+                      <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-semibold text-teal-700">Yes</span>
+                    ) : (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">No</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Page>
   )
 }
 

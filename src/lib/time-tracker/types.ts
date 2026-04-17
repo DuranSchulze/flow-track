@@ -1,4 +1,4 @@
-export type RolePermission = 'OWNER' | 'ADMIN' | 'MANAGER' | 'EMPLOYEE'
+export type RolePermission = 'OWNER' | 'ADMIN' | 'CATALOG_MANAGER' | 'MANAGER' | 'EMPLOYEE'
 
 export type ViewMode = 'day' | 'week' | 'month'
 
@@ -72,4 +72,19 @@ export type TrackerState = {
   tags: Tag[]
   members: Member[]
   entries: TimeEntry[]
+  /** departmentId → total tracked seconds. Present only for OWNER/ADMIN/CATALOG_MANAGER. */
+  departmentTotals?: Record<string, number>
+}
+
+export type ReportRow = {
+  date: string           // YYYY-MM-DD
+  memberName: string
+  department: string
+  role: string
+  task: string
+  project: string
+  tags: string           // comma-separated tag names
+  hours: number          // decimal, e.g. 1.5
+  billable: boolean
+  notes: string
 }

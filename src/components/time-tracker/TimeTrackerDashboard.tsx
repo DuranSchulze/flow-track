@@ -262,7 +262,7 @@ export function TimeTrackerDashboard({
               Time Tracker
             </h1>
             <p className="m-0 mt-1 text-sm text-slate-500">
-              {currentUser.name} - {currentUser.role}
+              {currentUser.name} - {currentUser.roleName}
             </p>
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-right">

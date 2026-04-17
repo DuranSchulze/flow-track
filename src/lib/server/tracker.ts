@@ -9,7 +9,7 @@ const inviteMemberSchema = z.object({
 
 const createRoleSchema = z.object({
   name: z.string().trim().min(1).max(100),
-  permissionLevel: z.enum(['OWNER', 'ADMIN', 'MANAGER', 'EMPLOYEE']),
+  permissionLevel: z.enum(['OWNER', 'ADMIN', 'CATALOG_MANAGER', 'MANAGER', 'EMPLOYEE']),
   color: z.string().default('#6366f1'),
 })
 
@@ -297,4 +297,18 @@ export const updateWorkspaceSettingsFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { updateWorkspaceSettings } = await import('./tracker.server')
     return updateWorkspaceSettings(data)
+  })
+
+// ─── Workspace report ─────────────────────────────────────────────────────────
+
+const getWorkspaceReportSchema = z.object({
+  view: z.enum(['day', 'week', 'month']),
+  date: z.string().datetime(),
+})
+
+export const getWorkspaceReportFn = createServerFn({ method: 'GET' })
+  .inputValidator((input) => getWorkspaceReportSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { getWorkspaceReport } = await import('./tracker.server')
+    return getWorkspaceReport(data)
   })

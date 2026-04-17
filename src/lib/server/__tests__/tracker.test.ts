@@ -18,7 +18,7 @@ import { WorkspaceAccessError } from '../workspace-access.server'
 
 const WORKSPACE_ID = 'ws_test_01'
 
-function makeAccess(role: 'OWNER' | 'ADMIN' | 'MANAGER' | 'EMPLOYEE', memberId = 'mbr_01') {
+function makeAccess(role: 'OWNER' | 'ADMIN' | 'CATALOG_MANAGER' | 'MANAGER' | 'EMPLOYEE', memberId = 'mbr_01') {
   return {
     session: { user: { id: 'usr_01', email: 'test@example.com' } },
     user: { id: 'usr_01', email: 'test@example.com' },
@@ -173,8 +173,50 @@ describe('permissions', () => {
 
     const { createProject } = await import('../tracker.server')
     await expect(createProject({ name: 'New Project', color: '#2563eb' })).rejects.toThrow(
-      'Only Owners and Admins',
+      'Only Owners, Admins, and Catalog Managers',
     )
+  })
+
+  it('allows CATALOG_MANAGER to create a project', async () => {
+    const requireWorkspaceAccess = await getRequireWorkspaceAccess()
+    requireWorkspaceAccess.mockResolvedValueOnce(makeAccess('CATALOG_MANAGER'))
+
+    const prisma = await getPrisma()
+    ;(prisma.project.findFirst as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null)
+    ;(prisma.project.create as ReturnType<typeof vi.fn>).mockResolvedValueOnce({})
+
+    const { createProject } = await import('../tracker.server')
+    await expect(createProject({ name: 'New Project', color: '#2563eb' })).resolves.not.toThrow()
+  })
+
+  it('allows CATALOG_MANAGER to create a tag', async () => {
+    const requireWorkspaceAccess = await getRequireWorkspaceAccess()
+    requireWorkspaceAccess.mockResolvedValueOnce(makeAccess('CATALOG_MANAGER'))
+
+    const prisma = await getPrisma()
+    ;(prisma.tag.findFirst as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null)
+    ;(prisma.tag.create as ReturnType<typeof vi.fn>).mockResolvedValueOnce({})
+
+    const { createTag } = await import('../tracker.server')
+    await expect(createTag({ name: 'New Tag', color: '#14b8a6' })).resolves.not.toThrow()
+  })
+
+  it('rejects CATALOG_MANAGER attempting to delete a department', async () => {
+    const requireWorkspaceAccess = await getRequireWorkspaceAccess()
+    requireWorkspaceAccess.mockResolvedValueOnce(makeAccess('CATALOG_MANAGER'))
+
+    const { deleteDepartment } = await import('../tracker.server')
+    await expect(deleteDepartment({ id: 'dept_01' })).rejects.toThrow('Only Owners and Admins')
+  })
+
+  it('rejects CATALOG_MANAGER attempting to change workspace settings', async () => {
+    const requireWorkspaceAccess = await getRequireWorkspaceAccess()
+    requireWorkspaceAccess.mockResolvedValueOnce(makeAccess('CATALOG_MANAGER'))
+
+    const { updateWorkspaceSettings } = await import('../tracker.server')
+    await expect(
+      updateWorkspaceSettings({ name: 'New Name', timezone: 'UTC' }),
+    ).rejects.toThrow('Only the workspace Owner')
   })
 
   it('rejects MANAGER attempting to delete a department', async () => {

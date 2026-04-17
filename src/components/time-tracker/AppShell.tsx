@@ -4,6 +4,7 @@ import {
   BriefcaseBusiness,
   CalendarDays,
   ClipboardList,
+  FileBarChart2,
   LayoutDashboard,
   LogOut,
   Settings,
@@ -14,24 +15,32 @@ import {
 import { authClient } from '#/lib/auth-client'
 import type { Workspace } from '#/lib/time-tracker/types'
 
-const navItems = [
-  { to: '/app/time-tracker', label: 'Timer', icon: LayoutDashboard },
-  { to: '/app/time-tracker/day', label: 'Day view', icon: CalendarDays },
-  { to: '/app/time-tracker/week', label: 'Week view', icon: BarChart3 },
-  { to: '/app/time-tracker/month', label: 'Month view', icon: ClipboardList },
-  { to: '/app/workspace/members', label: 'Members', icon: Users },
-  { to: '/app/workspace/catalogs', label: 'Catalogs', icon: Tags },
-  { to: '/app/workspace/settings', label: 'Settings', icon: Settings },
-]
-
 export function AppShell({
   workspace,
   user,
+  permissionLevel,
 }: {
   workspace: Workspace
   user: { id: string; name: string; email: string }
+  permissionLevel: string
 }) {
   const navigate = useNavigate()
+
+  const canSeeMembers = permissionLevel === 'OWNER' || permissionLevel === 'ADMIN'
+  const canSeeCatalogs = canSeeMembers || permissionLevel === 'CATALOG_MANAGER'
+  const canSeeReports = canSeeCatalogs
+  const canSeeSettings = permissionLevel === 'OWNER' || permissionLevel === 'ADMIN'
+
+  const navItems = [
+    { to: '/app/time-tracker' as const, label: 'Timer', icon: LayoutDashboard },
+    { to: '/app/time-tracker/day' as const, label: 'Day view', icon: CalendarDays },
+    { to: '/app/time-tracker/week' as const, label: 'Week view', icon: BarChart3 },
+    { to: '/app/time-tracker/month' as const, label: 'Month view', icon: ClipboardList },
+    ...(canSeeMembers ? [{ to: '/app/workspace/members' as const, label: 'Members', icon: Users }] : []),
+    ...(canSeeCatalogs ? [{ to: '/app/workspace/catalogs' as const, label: 'Catalogs', icon: Tags }] : []),
+    ...(canSeeReports ? [{ to: '/app/workspace/reports' as const, label: 'Reports', icon: FileBarChart2 }] : []),
+    ...(canSeeSettings ? [{ to: '/app/workspace/settings' as const, label: 'Settings', icon: Settings }] : []),
+  ]
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-950">

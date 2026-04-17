@@ -2,7 +2,7 @@ import '@tanstack/react-start/server-only'
 import { z } from 'zod'
 import { prisma } from '#/db'
 import { requireWorkspaceAccess } from './workspace-access.server'
-import type { TrackerState } from '#/lib/time-tracker/types'
+import type { TrackerState, ReportRow } from '#/lib/time-tracker/types'
 
 const entryInputSchema = z.object({
   description: z.string().trim().min(1),
@@ -88,8 +88,14 @@ export async function getTrackerState(): Promise<TrackerState> {
     const access = await requireWorkspaceAccess()
     const workspaceId = access.workspace.id
     const memberId = access.member.id
+    const permissionLevel = access.member.workspaceRole?.permissionLevel ?? 'EMPLOYEE'
 
-    const [roles, departments, cohorts, projects, tags, members, entries] =
+    const canSeeDeptTotals =
+      permissionLevel === 'OWNER' ||
+      permissionLevel === 'ADMIN' ||
+      permissionLevel === 'CATALOG_MANAGER'
+
+    const [roles, departments, cohorts, projects, tags, members, entries, rawDeptTotals] =
       await Promise.all([
         prisma.workspaceRole.findMany({
           where: { workspaceId },
@@ -136,7 +142,25 @@ export async function getTrackerState(): Promise<TrackerState> {
             startedAt: 'desc',
           },
         }),
+        canSeeDeptTotals
+          ? prisma.timeEntry.groupBy({
+              by: ['workspaceMemberId'],
+              where: { workspaceId },
+              _sum: { durationSeconds: true },
+            })
+          : Promise.resolve(null),
       ])
+
+    let departmentTotals: Record<string, number> | undefined
+    if (canSeeDeptTotals && rawDeptTotals !== null) {
+      departmentTotals = {}
+      for (const row of rawDeptTotals) {
+        const m = members.find((mbr) => mbr.id === row.workspaceMemberId)
+        if (!m?.departmentId) continue
+        const secs = row._sum.durationSeconds ?? 0
+        departmentTotals[m.departmentId] = (departmentTotals[m.departmentId] ?? 0) + secs
+      }
+    }
 
     return {
       workspace: {
@@ -192,6 +216,7 @@ export async function getTrackerState(): Promise<TrackerState> {
         durationSeconds: entry.durationSeconds,
         notes: entry.notes ?? '',
       })),
+      departmentTotals,
     }
 }
 
@@ -373,7 +398,7 @@ const inviteMemberSchema = z.object({
 
 const createRoleSchema = z.object({
   name: z.string().trim().min(1).max(100),
-  permissionLevel: z.enum(['OWNER', 'ADMIN', 'MANAGER', 'EMPLOYEE']),
+  permissionLevel: z.enum(['OWNER', 'ADMIN', 'CATALOG_MANAGER', 'MANAGER', 'EMPLOYEE']),
   color: z.string().default('#6366f1'),
 })
 
@@ -381,6 +406,13 @@ function assertOwnerOrAdmin(access: { member: { workspaceRole: { permissionLevel
   const level = access.member.workspaceRole?.permissionLevel
   if (level !== 'OWNER' && level !== 'ADMIN') {
     throw new Error('Only Owners and Admins can perform this action.')
+  }
+}
+
+function assertCanManageCatalogs(access: { member: { workspaceRole: { permissionLevel: string } | null } }) {
+  const level = access.member.workspaceRole?.permissionLevel
+  if (level !== 'OWNER' && level !== 'ADMIN' && level !== 'CATALOG_MANAGER') {
+    throw new Error('Only Owners, Admins, and Catalog Managers can perform this action.')
   }
 }
 
@@ -457,7 +489,7 @@ const idSchema = z.object({ id: z.string().min(1) })
 
 export async function createProject(data: z.infer<typeof createProjectSchema>) {
   const access = await requireWorkspaceAccess()
-  assertOwnerOrAdmin(access)
+  assertCanManageCatalogs(access)
 
   const existing = await prisma.project.findFirst({
     where: { workspaceId: access.workspace.id, name: { equals: data.name, mode: 'insensitive' } },
@@ -471,7 +503,7 @@ export async function createProject(data: z.infer<typeof createProjectSchema>) {
 
 export async function updateProject(data: z.infer<typeof updateProjectSchema>) {
   const access = await requireWorkspaceAccess()
-  assertOwnerOrAdmin(access)
+  assertCanManageCatalogs(access)
 
   await prisma.project.updateMany({
     where: { id: data.id, workspaceId: access.workspace.id },
@@ -481,7 +513,7 @@ export async function updateProject(data: z.infer<typeof updateProjectSchema>) {
 
 export async function archiveProject(data: z.infer<typeof idSchema>) {
   const access = await requireWorkspaceAccess()
-  assertOwnerOrAdmin(access)
+  assertCanManageCatalogs(access)
 
   await prisma.project.updateMany({
     where: { id: data.id, workspaceId: access.workspace.id },
@@ -504,7 +536,7 @@ const updateTagSchema = z.object({
 
 export async function createTag(data: z.infer<typeof createTagSchema>) {
   const access = await requireWorkspaceAccess()
-  assertOwnerOrAdmin(access)
+  assertCanManageCatalogs(access)
 
   const existing = await prisma.tag.findFirst({
     where: { workspaceId: access.workspace.id, name: { equals: data.name, mode: 'insensitive' } },
@@ -518,7 +550,7 @@ export async function createTag(data: z.infer<typeof createTagSchema>) {
 
 export async function updateTag(data: z.infer<typeof updateTagSchema>) {
   const access = await requireWorkspaceAccess()
-  assertOwnerOrAdmin(access)
+  assertCanManageCatalogs(access)
 
   await prisma.tag.updateMany({
     where: { id: data.id, workspaceId: access.workspace.id },
@@ -528,7 +560,7 @@ export async function updateTag(data: z.infer<typeof updateTagSchema>) {
 
 export async function archiveTag(data: z.infer<typeof idSchema>) {
   const access = await requireWorkspaceAccess()
-  assertOwnerOrAdmin(access)
+  assertCanManageCatalogs(access)
 
   await prisma.tag.updateMany({
     where: { id: data.id, workspaceId: access.workspace.id },
@@ -765,6 +797,79 @@ export async function updateWorkspaceSettings(data: z.infer<typeof updateWorkspa
     where: { id: access.workspace.id },
     data: { name: data.name, timezone: data.timezone },
   })
+}
+
+// ─── Workspace report ─────────────────────────────────────────────────────────
+
+const getWorkspaceReportSchema = z.object({
+  view: z.enum(['day', 'week', 'month']),
+  date: z.string().datetime(),
+})
+
+function getReportRange(view: 'day' | 'week' | 'month', date: Date) {
+  const start = new Date(date)
+  start.setHours(0, 0, 0, 0)
+
+  if (view === 'week') {
+    const day = start.getDay()
+    const offset = day === 0 ? -6 : 1 - day
+    start.setDate(start.getDate() + offset)
+  }
+
+  if (view === 'month') {
+    start.setDate(1)
+  }
+
+  const end = new Date(start)
+  if (view === 'day') end.setDate(start.getDate() + 1)
+  else if (view === 'week') end.setDate(start.getDate() + 7)
+  else end.setMonth(start.getMonth() + 1)
+
+  return { start, end }
+}
+
+export async function getWorkspaceReport(
+  data: z.infer<typeof getWorkspaceReportSchema>,
+): Promise<ReportRow[]> {
+  const access = await requireWorkspaceAccess()
+  assertCanManageCatalogs(access)
+
+  const { start, end } = getReportRange(data.view, new Date(data.date))
+
+  const entries = await prisma.timeEntry.findMany({
+    where: {
+      workspaceId: access.workspace.id,
+      startedAt: { gte: start, lt: end },
+      endedAt: { not: null },
+    },
+    include: {
+      workspaceMember: {
+        include: {
+          user: true,
+          workspaceRole: true,
+          department: true,
+        },
+      },
+      project: true,
+      tags: {
+        include: { tag: true },
+      },
+    },
+    orderBy: { startedAt: 'asc' },
+  })
+
+  return entries.map((entry) => ({
+    date: entry.startedAt.toISOString().slice(0, 10),
+    memberName: entry.workspaceMember.user?.name ?? entry.workspaceMember.email,
+    department: entry.workspaceMember.department?.name ?? '—',
+    role: entry.workspaceMember.workspaceRole?.name ?? '—',
+    task: entry.description,
+    project: entry.project?.name ?? '—',
+    tags: entry.tags.map((t) => t.tag.name).join(', '),
+    hours: Number((entry.durationSeconds / 3600).toFixed(2)),
+    billable: entry.billable,
+    notes: entry.notes ?? '',
+  }))
 }
 
 export const trackerSchemas = {

@@ -15,7 +15,7 @@ Primary planning files:
 
 - Auth and profiles: employee account creation, login/logout, secure session handling, profile page, name/email/avatar/basic employment metadata.
 - Workspace: Owner creates a workspace; Owner/Admin manages workspace user list; employees join only when their account email matches an allowed workspace member record.
-- Roles: workspace-level `Owner`, `Admin`, and `Employee`; Owner/Admin can manage workspace catalogs and view all reports; Employees manage only their own time entries.
+- Roles: workspace-level `Owner`, `Admin`, `Catalog Manager`, `Manager`, and `Employee`; Owner/Admin can manage all workspace resources and view all reports; Catalog Manager can manage projects and tags and view department time totals; Manager and Employee manage only their own time entries.
 - Organization tagging: Owner/Admin creates departments and optional groups/cohorts; employees can be assigned to one department and optionally one or more groups/cohorts.
 - Catalogs: Owner/Admin creates Projects and Tags; Employees select from these controlled workspace lists when tracking time.
 - Time Tracker: start/stop one active timer per employee; create manual entries; set task description, project, tags, billable/non-billable, start/end/duration, and notes.
@@ -26,7 +26,7 @@ Primary planning files:
 
 ## Key Implementation Changes
 
-- Replace starter/demo product surface with an authenticated app shell: public auth pages, protected dashboard routes, top navbar, sidebar, and workspace-aware routing.
+- Replace starter/demo product surface with an authenticated app shell: public auth pages, lounge/waiting page for pending members, protected dashboard routes, top navbar, sidebar, and workspace-aware routing.
 - Keep Better Auth for email/password auth; store app-specific profile, membership, role, and workspace data in Prisma/Postgres instead of overloading auth records.
 - Add Prisma models for `Workspace`, `WorkspaceMember`, `Department`, `Group/Cohort`, `Project`, `Tag`, `TimeEntry`, and a time-entry-to-tag join table.
 - Enforce workspace isolation in every query by `workspaceId`; employees can only access their own entries, while Owner/Admin can access workspace-level management and reports.
@@ -46,6 +46,7 @@ Main protected routes:
 - `/app/workspace/members`
 - `/app/workspace/settings`
 - `/app/workspace/catalogs`
+- `/app/workspace/reports`
 - `/app/profile`
 
 Time entry fields:
@@ -82,7 +83,7 @@ Reports calculate totals from stored entry timestamps/duration using the workspa
 
 - This is private/internal for now, but the data model should remain SaaS-ready for future multi-company use.
 - Workspace joining in v1 is controlled by Owner/Admin-managed member records, not open registration or public invite links.
-- Roles are simple workspace roles: `Owner`, `Admin`, `Employee`.
+- Roles are workspace roles with a five-tier hierarchy: `Owner`, `Admin`, `Catalog Manager`, `Manager`, `Employee`.
 - Owner/Admin only can create company-wide departments, groups/cohorts, projects, and tags.
 - Employees can run only one active timer at a time.
 - Employees see only their own time data; Owner/Admin can see all workspace time data.

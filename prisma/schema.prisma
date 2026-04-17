@@ -25,6 +25,7 @@ enum MaritalStatus {
 enum RolePermission {
   OWNER
   ADMIN
+  CATALOG_MANAGER
   MANAGER
   EMPLOYEE
 }

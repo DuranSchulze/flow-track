@@ -27,6 +27,7 @@ async function main() {
   const defaultRoles = [
     { name: 'Owner', permissionLevel: 'OWNER' as const, color: '#0f172a' },
     { name: 'Admin', permissionLevel: 'ADMIN' as const, color: '#7c3aed' },
+    { name: 'Catalog Manager', permissionLevel: 'CATALOG_MANAGER' as const, color: '#0891b2' },
     { name: 'Manager', permissionLevel: 'MANAGER' as const, color: '#2563eb' },
     { name: 'Employee', permissionLevel: 'EMPLOYEE' as const, color: '#14b8a6' },
   ]

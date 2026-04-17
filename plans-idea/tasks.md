@@ -2,7 +2,9 @@
 
 - [x] Add planning documentation.
 - [x] Add Prisma schema for workspaces, roles, catalogs, and time entries.
+  - Includes UserProfile, UserAddress, EmployeeProfile, EmployeeGovernmentId (no UI yet), CohortMember, TimeEntryTag, and enums.
 - [x] Replace starter landing page with Time Tracker entry point.
+- [x] Add lounge/waiting page for users with no active workspace membership.
 - [x] Add authenticated app shell with navbar and sidebar.
 - [x] Add interactive Time Tracker MVP screens with seeded local data.
 - [x] Add profile, workspace settings, members, and catalogs screens.
@@ -19,6 +21,7 @@
   - [x] Profile update (updateProfile)
   - [x] Workspace settings update (updateWorkspaceSettings)
 - [x] Connect Better Auth session to workspace membership enforcement.
+  - Auto-links invited member record when user logs in with matching email.
 - [x] Wire catalog/member/profile/settings mutations into UI screens.
   - [x] CatalogsScreen — Projects manager (create, archive)
   - [x] CatalogsScreen — Tags manager (create, archive)
@@ -27,6 +30,14 @@
   - [x] MembersScreen — inline role, department, cohort edit + disable/reactivate
   - [x] SettingsScreen — editable workspace name and timezone form (Owner only)
   - [x] ProfileScreen — editable display name, first/last name, contact form
+- [x] Add CATALOG_MANAGER role — projects/tags full CRUD, department time-total view, filtered sidebar nav.
+- [x] Add Reports page with CSV, Excel (.xlsx), and PDF export.
+  - Route: /app/workspace/reports
+  - Access: Owner, Admin, Catalog Manager
+  - Libraries: xlsx (SheetJS), jspdf, jspdf-autotable
+  - Supports Day/Week/Month view with date navigation and live preview table
+- [x] Add light/dark mode theme toggle.
+- [x] Add toast notifications (goey-toast) for all create, update, and delete operations.
 - [x] Add integration tests for auth, permissions, timer rules, and reports.
   - Tests located at: src/lib/server/__tests__/tracker.test.ts
   - Run with: pnpm test
