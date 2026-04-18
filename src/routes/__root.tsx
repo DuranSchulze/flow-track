@@ -1,5 +1,6 @@
 import {
   HeadContent,
+  Link,
   Scripts,
   createRootRouteWithContext,
 } from '@tanstack/react-router'
@@ -7,12 +8,30 @@ import { GooeyToaster } from 'goey-toast'
 import 'goey-toast/styles.css'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
+import { Button } from '../components/ui/button'
 
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import appCss from '../styles.css?url'
 
 import type { QueryClient } from '@tanstack/react-query'
+
+function NotFoundComponent() {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 p-4 text-center">
+      <div className="space-y-2">
+        <h1 className="text-6xl font-bold text-primary">404</h1>
+        <h2 className="text-2xl font-semibold">Page Not Found</h2>
+        <p className="text-muted-foreground">
+          The page you're looking for doesn't exist or has been moved.
+        </p>
+      </div>
+      <Button asChild>
+        <Link to="/app/time-tracker">Go to Time Tracker</Link>
+      </Button>
+    </div>
+  )
+}
 
 interface MyRouterContext {
   queryClient: QueryClient
@@ -42,6 +61,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
     ],
   }),
   shellComponent: RootDocument,
+  notFoundComponent: NotFoundComponent,
 })
 
 function RootDocument({ children }: { children: React.ReactNode }) {
