@@ -1,27 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Moon, Sun } from 'lucide-react'
+import { applyTheme, getStoredTheme } from '#/lib/theme'
+import type { ThemeMode } from '#/lib/theme'
+import { cn } from '#/lib/utils'
 
-type ThemeMode = 'light' | 'dark'
-
-function getResolvedTheme(): ThemeMode {
-  if (typeof window === 'undefined') return 'light'
-  return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
-}
-
-function applyTheme(mode: ThemeMode): void {
-  const root = document.documentElement
-  root.classList.remove('light', 'dark')
-  root.classList.add(mode)
-  root.setAttribute('data-theme', mode)
-  root.style.colorScheme = mode
-  window.localStorage.setItem('theme', mode)
-}
-
-export function ThemeToggle() {
+export function ThemeToggle({ className }: { className?: string }) {
   const [theme, setTheme] = useState<ThemeMode>('light')
 
   useEffect(() => {
-    setTheme(getResolvedTheme())
+    setTheme(getStoredTheme())
+    function onThemeChange(event: Event) {
+      const detail = (event as CustomEvent<unknown>).detail
+      if (detail === 'light' || detail === 'dark') setTheme(detail)
+    }
+    window.addEventListener('theme-change', onThemeChange)
+    return () => window.removeEventListener('theme-change', onThemeChange)
   }, [])
 
   function toggle(): void {
@@ -34,10 +27,19 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggle}
-      aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-      className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+      aria-label={
+        theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
+      }
+      className={cn(
+        'inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100',
+        className,
+      )}
     >
-      {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      {theme === 'dark' ? (
+        <Sun className="h-4 w-4" />
+      ) : (
+        <Moon className="h-4 w-4" />
+      )}
     </button>
   )
 }

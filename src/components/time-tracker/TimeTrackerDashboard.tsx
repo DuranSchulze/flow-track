@@ -316,24 +316,24 @@ export function TimeTrackerDashboard({
   return (
     <div className="grid gap-6">
       {/* ── Header + metrics ── */}
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <section className="rounded-lg border border-border bg-card p-4 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="m-0 text-sm font-semibold text-teal-700">
+            <p className="m-0 text-sm font-semibold text-primary">
               {state.workspace.name}
             </p>
-            <h1 className="m-0 mt-1 text-2xl font-bold tracking-tight text-slate-950">
+            <h1 className="m-0 mt-1 text-2xl font-bold tracking-tight text-foreground">
               Time Tracker
             </h1>
-            <p className="m-0 mt-1 text-sm text-slate-500">
+            <p className="m-0 mt-1 text-sm text-muted-foreground">
               {currentUser.name} · {currentUser.roleName}
             </p>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-right">
-            <p className="m-0 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <div className="rounded-lg border border-border bg-muted px-4 py-3 text-right">
+            <p className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {view} total
             </p>
-            <p className="m-0 mt-1 text-2xl font-bold text-slate-950">
+            <p className="m-0 mt-1 text-2xl font-bold text-foreground">
               {formatHours(totals.selectedTotal)}
             </p>
           </div>
@@ -357,16 +357,16 @@ export function TimeTrackerDashboard({
       </section>
 
       {/* ── Input section with toggle ── */}
-      <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
+      <section className="rounded-lg border border-border bg-card shadow-sm">
         {/* Toggle tabs */}
-        <div className="flex border-b border-slate-200">
+        <div className="flex border-b border-border">
           <button
             type="button"
             onClick={() => setInputMode('timer')}
             className={`flex-1 py-3 text-sm font-bold transition-colors ${
               inputMode === 'timer'
-                ? 'border-b-2 border-slate-950 text-slate-950'
-                : 'text-slate-500 hover:text-slate-700'
+                ? 'border-b-2 border-primary text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             <Play className="mr-1.5 inline h-3.5 w-3.5" />
@@ -377,8 +377,8 @@ export function TimeTrackerDashboard({
             onClick={() => setInputMode('manual')}
             className={`flex-1 py-3 text-sm font-bold transition-colors ${
               inputMode === 'manual'
-                ? 'border-b-2 border-slate-950 text-slate-950'
-                : 'text-slate-500 hover:text-slate-700'
+                ? 'border-b-2 border-primary text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             <Pencil className="mr-1.5 inline h-3.5 w-3.5" />
@@ -397,7 +397,7 @@ export function TimeTrackerDashboard({
                   onKeyDown={(e) => e.key === 'Enter' && startTimer()}
                   placeholder="What are you working on?"
                   disabled={!!activeEntry}
-                  className="h-11 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600 disabled:bg-slate-50 disabled:text-slate-400"
+                  className="h-11 rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary disabled:bg-muted disabled:text-muted-foreground"
                 />
                 <ProjectPicker
                   projects={state.projects}
@@ -419,10 +419,10 @@ export function TimeTrackerDashboard({
                   disabled={
                     pending || (!activeEntry && !timerDescription.trim())
                   }
-                  className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold text-white transition-colors disabled:cursor-not-allowed disabled:bg-slate-300 ${
+                  className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground ${
                     activeEntry
-                      ? 'bg-red-600 hover:bg-red-700'
-                      : 'bg-slate-950 hover:bg-slate-800'
+                      ? 'bg-destructive text-primary-foreground hover:brightness-110'
+                      : 'bg-primary text-primary-foreground hover:brightness-110'
                   }`}
                 >
                   {activeEntry ? (
@@ -435,7 +435,7 @@ export function TimeTrackerDashboard({
               </div>
 
               {!activeEntry && (
-                <label className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-slate-700">
+                <label className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-foreground">
                   <input
                     type="checkbox"
                     checked={timerBillable}
@@ -446,15 +446,15 @@ export function TimeTrackerDashboard({
               )}
 
               {activeEntry && (
-                <div className="rounded-lg border border-teal-200 bg-teal-50 p-4">
-                  <p className="m-0 text-xs font-bold uppercase tracking-wide text-teal-600">
+                <div className="rounded-lg border border-primary/30 bg-primary/10 p-4">
+                  <p className="m-0 text-xs font-bold uppercase tracking-wide text-primary">
                     Running now
                   </p>
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-                    <p className="m-0 font-bold text-slate-950">
+                    <p className="m-0 font-bold text-foreground">
                       {activeEntry.description}
                     </p>
-                    <p className="m-0 font-mono text-2xl font-bold text-slate-950">
+                    <p className="m-0 font-mono text-2xl font-bold text-foreground">
                       {formatDuration(getEntrySeconds(activeEntry, tick))}
                     </p>
                   </div>
@@ -466,7 +466,7 @@ export function TimeTrackerDashboard({
           {/* ── Manual entry panel ── */}
           {inputMode === 'manual' && (
             <div className="grid gap-3">
-              <p className="m-0 text-sm text-slate-500">
+              <p className="m-0 text-sm text-muted-foreground">
                 Add time when work was tracked outside the timer.
               </p>
               <EntryDraftForm
@@ -486,7 +486,7 @@ export function TimeTrackerDashboard({
                     !draft.description.trim() ||
                     calculateManualSeconds(draft) <= 0
                   }
-                  className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
                 >
                   <Plus className="h-4 w-4" />
                   Add entry
@@ -498,17 +498,17 @@ export function TimeTrackerDashboard({
       </section>
 
       {/* ── Entries section ── */}
-      <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
+      <section className="rounded-lg border border-border bg-card shadow-sm">
         {/* Entries header + filter controls */}
-        <div className="border-b border-slate-200 p-4">
+        <div className="border-b border-border p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="m-0 text-lg font-bold text-slate-950">Entries</h2>
-              <p className="m-0 mt-1 text-sm text-slate-500">
+              <h2 className="m-0 text-lg font-bold text-foreground">Entries</h2>
+              <p className="m-0 mt-1 text-sm text-muted-foreground">
                 {range.start.toLocaleDateString()} –{' '}
                 {new Date(range.end.getTime() - 1).toLocaleDateString()}
                 {filteredEntries.length !== baseFiltered.length && (
-                  <span className="ml-2 text-teal-700 font-semibold">
+                  <span className="ml-2 text-primary font-semibold">
                     {filteredEntries.length} of {baseFiltered.length} shown
                   </span>
                 )}
@@ -519,7 +519,7 @@ export function TimeTrackerDashboard({
                 <button
                   type="button"
                   onClick={clearFilters}
-                  className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+                  className="inline-flex items-center gap-1 rounded-lg border border-destructive/30 px-2.5 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10"
                 >
                   <X className="h-3 w-3" />
                   Clear ({activeFilterCount})
@@ -530,14 +530,14 @@ export function TimeTrackerDashboard({
                 onClick={() => setShowFilters((p) => !p)}
                 className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors ${
                   showFilters || activeFilterCount > 0
-                    ? 'border-slate-950 bg-slate-950 text-white'
-                    : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border text-foreground hover:bg-accent'
                 }`}
               >
                 <Filter className="h-3.5 w-3.5" />
                 Filter / Sort
                 {activeFilterCount > 0 && (
-                  <span className="ml-0.5 rounded-full bg-white px-1.5 text-xs font-bold text-slate-950">
+                  <span className="ml-0.5 rounded-full bg-card px-1.5 text-xs font-bold text-foreground">
                     {activeFilterCount}
                   </span>
                 )}
@@ -547,13 +547,13 @@ export function TimeTrackerDashboard({
 
           {/* Filter + sort panel */}
           {showFilters && (
-            <div className="mt-3 grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-4">
-              <label className="grid gap-1 text-xs font-semibold text-slate-600">
+            <div className="mt-3 grid gap-3 rounded-lg border border-border bg-muted p-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
                 Project
                 <select
                   value={filterProject}
                   onChange={(e) => setFilterProject(e.target.value)}
-                  className="h-8 rounded border border-slate-300 bg-white px-2 text-sm outline-none focus:border-teal-600"
+                  className="h-8 rounded border border-border bg-card text-foreground px-2 text-sm outline-none focus:border-primary"
                 >
                   <option value="">All projects</option>
                   {state.projects.map((p) => (
@@ -563,12 +563,12 @@ export function TimeTrackerDashboard({
                   ))}
                 </select>
               </label>
-              <label className="grid gap-1 text-xs font-semibold text-slate-600">
+              <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
                 Tag
                 <select
                   value={filterTag}
                   onChange={(e) => setFilterTag(e.target.value)}
-                  className="h-8 rounded border border-slate-300 bg-white px-2 text-sm outline-none focus:border-teal-600"
+                  className="h-8 rounded border border-border bg-card text-foreground px-2 text-sm outline-none focus:border-primary"
                 >
                   <option value="">All tags</option>
                   {state.tags.map((t) => (
@@ -578,21 +578,21 @@ export function TimeTrackerDashboard({
                   ))}
                 </select>
               </label>
-              <label className="grid gap-1 text-xs font-semibold text-slate-600">
+              <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
                 Billable
                 <select
                   value={filterBillable}
                   onChange={(e) =>
                     setFilterBillable(e.target.value as 'all' | 'yes' | 'no')
                   }
-                  className="h-8 rounded border border-slate-300 bg-white px-2 text-sm outline-none focus:border-teal-600"
+                  className="h-8 rounded border border-border bg-card text-foreground px-2 text-sm outline-none focus:border-primary"
                 >
                   <option value="all">All entries</option>
                   <option value="yes">Billable only</option>
                   <option value="no">Non-billable only</option>
                 </select>
               </label>
-              <label className="grid gap-1 text-xs font-semibold text-slate-600">
+              <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
                 <span className="inline-flex items-center gap-1">
                   <ArrowDownUp className="h-3 w-3" />
                   Sort by
@@ -600,7 +600,7 @@ export function TimeTrackerDashboard({
                 <select
                   value={sortKey}
                   onChange={(e) => setSortKey(e.target.value as SortKey)}
-                  className="h-8 rounded border border-slate-300 bg-white px-2 text-sm outline-none focus:border-teal-600"
+                  className="h-8 rounded border border-border bg-card text-foreground px-2 text-sm outline-none focus:border-primary"
                 >
                   <option value="newest">Newest first</option>
                   <option value="oldest">Oldest first</option>
@@ -615,7 +615,7 @@ export function TimeTrackerDashboard({
         {/* Entries table */}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px] border-collapse text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">Task</th>
                 <th className="px-4 py-3">Project</th>
@@ -630,7 +630,7 @@ export function TimeTrackerDashboard({
                 <tr>
                   <td
                     colSpan={6}
-                    className="px-4 py-10 text-center text-sm text-slate-400"
+                    className="px-4 py-10 text-center text-sm text-muted-foreground"
                   >
                     {baseFiltered.length === 0
                       ? 'No entries in this period yet.'
@@ -643,7 +643,7 @@ export function TimeTrackerDashboard({
                     (p) => p.id === entry.projectId,
                   )
                   return (
-                    <tr key={entry.id} className="border-t border-slate-100">
+                    <tr key={entry.id} className="border-t border-border">
                       <td className="px-4 py-3">
                         {editingId === entry.id ? (
                           <EntryDraftForm
@@ -657,10 +657,10 @@ export function TimeTrackerDashboard({
                           />
                         ) : (
                           <div>
-                            <p className="m-0 font-semibold text-slate-950">
+                            <p className="m-0 font-semibold text-foreground">
                               {entry.description}
                             </p>
-                            <p className="m-0 mt-1 text-xs text-slate-500">
+                            <p className="m-0 mt-1 text-xs text-muted-foreground">
                               {new Date(entry.startedAt).toLocaleString()}
                             </p>
                           </div>
@@ -668,7 +668,7 @@ export function TimeTrackerDashboard({
                       </td>
                       <td className="px-4 py-3">
                         {project ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                          <span className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-2 py-1 text-xs font-semibold text-foreground">
                             <span
                               className="inline-block h-2 w-2 rounded-full"
                               style={{ backgroundColor: project.color }}
@@ -676,7 +676,7 @@ export function TimeTrackerDashboard({
                             {project.name}
                           </span>
                         ) : (
-                          <span className="text-xs text-slate-400">
+                          <span className="text-xs text-muted-foreground">
                             No project
                           </span>
                         )}
@@ -686,7 +686,7 @@ export function TimeTrackerDashboard({
                           {selectedTags(entry.tagIds).map((tag) => (
                             <span
                               key={tag.id}
-                              className="rounded-lg border border-slate-200 px-2 py-0.5 text-xs font-semibold"
+                              className="rounded-lg border border-border px-2 py-0.5 text-xs font-semibold"
                               style={{
                                 color: tag.color,
                                 borderColor: tag.color + '55',
@@ -701,14 +701,14 @@ export function TimeTrackerDashboard({
                         <span
                           className={`rounded px-1.5 py-0.5 text-xs font-bold ${
                             entry.billable
-                              ? 'bg-teal-100 text-teal-800'
-                              : 'text-slate-400'
+                              ? 'bg-primary/15 text-primary'
+                              : 'text-muted-foreground'
                           }`}
                         >
                           {entry.billable ? 'Billable' : '—'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 font-mono font-bold">
+                      <td className="px-4 py-3 font-mono font-bold text-foreground">
                         {formatDuration(getEntrySeconds(entry, tick))}
                       </td>
                       <td className="px-4 py-3">
@@ -719,7 +719,7 @@ export function TimeTrackerDashboard({
                                 type="button"
                                 onClick={saveEdit}
                                 disabled={pending}
-                                className="rounded-lg bg-slate-950 p-2 text-white hover:bg-slate-800"
+                                className="rounded-lg bg-primary p-2 text-primary-foreground hover:brightness-110"
                                 aria-label="Save entry"
                               >
                                 <Save className="h-4 w-4" />
@@ -727,7 +727,7 @@ export function TimeTrackerDashboard({
                               <button
                                 type="button"
                                 onClick={() => setEditingId(null)}
-                                className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
+                                className="rounded-lg border border-border p-2 text-muted-foreground hover:bg-accent"
                                 aria-label="Cancel edit"
                               >
                                 <X className="h-4 w-4" />
@@ -738,7 +738,7 @@ export function TimeTrackerDashboard({
                               type="button"
                               onClick={() => openEdit(entry)}
                               disabled={pending}
-                              className="rounded-lg border border-slate-200 p-2 text-slate-700 hover:bg-slate-50"
+                              className="rounded-lg border border-border p-2 text-foreground hover:bg-accent"
                               aria-label="Edit entry"
                             >
                               <Pencil className="h-4 w-4" />
@@ -748,7 +748,7 @@ export function TimeTrackerDashboard({
                             type="button"
                             onClick={() => duplicateEntry(entry)}
                             disabled={pending}
-                            className="rounded-lg border border-slate-200 p-2 text-slate-700 hover:bg-slate-50"
+                            className="rounded-lg border border-border p-2 text-foreground hover:bg-accent"
                             aria-label="Duplicate entry"
                           >
                             <Copy className="h-4 w-4" />
@@ -757,7 +757,7 @@ export function TimeTrackerDashboard({
                             type="button"
                             onClick={() => removeEntry(entry.id)}
                             disabled={pending}
-                            className="rounded-lg border border-red-200 p-2 text-red-700 hover:bg-red-50"
+                            className="rounded-lg border border-destructive/30 p-2 text-destructive hover:bg-destructive/10"
                             aria-label="Delete entry"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -778,11 +778,11 @@ export function TimeTrackerDashboard({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="m-0 text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <div className="rounded-lg border border-border bg-card p-4 shadow-sm">
+      <p className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className="m-0 mt-2 text-2xl font-bold text-slate-950">{value}</p>
+      <p className="m-0 mt-2 text-2xl font-bold text-foreground">{value}</p>
     </div>
   )
 }
@@ -810,7 +810,7 @@ function EntryDraftForm({
         value={draft.description}
         onChange={(e) => setDraft({ ...draft, description: e.target.value })}
         placeholder="Task description"
-        className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600 lg:col-span-2"
+        className="h-10 rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary lg:col-span-2"
       />
       <ProjectPicker
         projects={projects}
@@ -828,15 +828,15 @@ function EntryDraftForm({
         type="datetime-local"
         value={draft.startedAt}
         onChange={(e) => setDraft({ ...draft, startedAt: e.target.value })}
-        className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600"
+        className="h-10 rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary"
       />
       <input
         type="datetime-local"
         value={draft.endedAt}
         onChange={(e) => setDraft({ ...draft, endedAt: e.target.value })}
-        className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600"
+        className="h-10 rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary"
       />
-      <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
+      <label className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
         <input
           type="checkbox"
           checked={draft.billable}
@@ -849,7 +849,7 @@ function EntryDraftForm({
           value={draft.notes}
           onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
           placeholder="Notes (optional)"
-          className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-teal-600 lg:col-span-5"
+          className="h-10 rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary lg:col-span-5"
         />
       )}
     </div>
@@ -915,7 +915,7 @@ function ProjectPicker({
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setOpen((o) => !o)}
-        className="flex h-10 w-full items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+        className="flex h-10 w-full items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-foreground transition-colors hover:border-border/80 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
       >
         {selected ? (
           <>
@@ -926,25 +926,27 @@ function ProjectPicker({
             <span className="flex-1 truncate text-left">{selected.name}</span>
           </>
         ) : (
-          <span className="flex-1 text-left text-slate-400">No project</span>
+          <span className="flex-1 text-left text-muted-foreground">
+            No project
+          </span>
         )}
-        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       </button>
 
       {open && (
-        <div className="absolute left-0 top-[calc(100%+4px)] z-50 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-          <div className="border-b border-slate-100 p-2">
+        <div className="absolute left-0 top-[calc(100%+4px)] z-50 w-64 overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+          <div className="border-b border-border p-2">
             <input
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search projects…"
-              className="h-8 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-teal-500"
+              className="h-8 w-full rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary"
             />
           </div>
           <div className="max-h-48 overflow-y-auto py-1">
             {filtered.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-slate-400">
+              <p className="px-3 py-2 text-xs text-muted-foreground">
                 No projects found
               </p>
             ) : (
@@ -957,10 +959,10 @@ function ProjectPicker({
                     setOpen(false)
                     setSearch('')
                   }}
-                  className={`flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-slate-50 ${
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-accent ${
                     p.id === value
-                      ? 'font-semibold text-slate-950'
-                      : 'text-slate-700'
+                      ? 'font-semibold text-foreground'
+                      : 'text-foreground'
                   }`}
                 >
                   <span
@@ -969,13 +971,13 @@ function ProjectPicker({
                   />
                   <span className="flex-1 truncate text-left">{p.name}</span>
                   {p.id === value && (
-                    <Check className="h-3.5 w-3.5 text-teal-600" />
+                    <Check className="h-3.5 w-3.5 text-primary" />
                   )}
                 </button>
               ))
             )}
           </div>
-          <div className="border-t border-slate-100 p-2">
+          <div className="border-t border-border p-2">
             {creating ? (
               <form onSubmit={handleCreate} className="grid gap-2">
                 <div className="flex gap-2">
@@ -984,21 +986,21 @@ function ProjectPicker({
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     placeholder="Project name"
-                    className="h-8 flex-1 rounded-lg border border-slate-200 px-2 text-sm outline-none focus:border-teal-500"
+                    className="h-8 flex-1 rounded-lg border border-border bg-card text-foreground px-2 text-sm outline-none focus:border-primary"
                   />
                   <input
                     type="color"
                     value={newColor}
                     onChange={(e) => setNewColor(e.target.value)}
                     title="Pick a color"
-                    className="h-8 w-10 cursor-pointer rounded-lg border border-slate-200 p-0.5"
+                    className="h-8 w-10 cursor-pointer rounded-lg border border-border p-0.5"
                   />
                 </div>
                 <div className="flex gap-1.5">
                   <button
                     type="submit"
                     disabled={createPending || !newName.trim()}
-                    className="flex-1 rounded-lg bg-teal-700 py-1.5 text-xs font-bold text-white hover:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400"
+                    className="flex-1 rounded-lg bg-primary py-1.5 text-xs font-bold text-primary-foreground hover:brightness-110 disabled:bg-muted disabled:text-muted-foreground"
                   >
                     {createPending ? 'Creating…' : 'Create'}
                   </button>
@@ -1008,7 +1010,7 @@ function ProjectPicker({
                       setCreating(false)
                       setNewName('')
                     }}
-                    className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                    className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-accent"
                   >
                     Cancel
                   </button>
@@ -1018,7 +1020,7 @@ function ProjectPicker({
               <button
                 type="button"
                 onClick={() => setCreating(true)}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-50"
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15"
               >
                 <Plus className="h-3.5 w-3.5" />
                 New project
@@ -1095,7 +1097,7 @@ function TagPicker({
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setOpen((o) => !o)}
-        className="flex h-10 w-full items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+        className="flex h-10 w-full items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-semibold text-foreground transition-colors hover:border-border/80 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
       >
         <div className="flex flex-1 items-center gap-1 overflow-hidden">
           {selected.length > 0 ? (
@@ -1109,31 +1111,33 @@ function TagPicker({
               </span>
             ))
           ) : (
-            <span className="text-slate-400">No tags</span>
+            <span className="text-muted-foreground">No tags</span>
           )}
           {selected.length > 2 && (
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-muted-foreground">
               +{selected.length - 2}
             </span>
           )}
         </div>
-        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       </button>
 
       {open && (
-        <div className="absolute left-0 top-[calc(100%+4px)] z-50 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-          <div className="border-b border-slate-100 p-2">
+        <div className="absolute left-0 top-[calc(100%+4px)] z-50 w-64 overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+          <div className="border-b border-border p-2">
             <input
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search tags…"
-              className="h-8 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-teal-500"
+              className="h-8 w-full rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary"
             />
           </div>
           <div className="max-h-48 overflow-y-auto py-1">
             {filtered.length === 0 ? (
-              <p className="px-3 py-2 text-xs text-slate-400">No tags found</p>
+              <p className="px-3 py-2 text-xs text-muted-foreground">
+                No tags found
+              </p>
             ) : (
               filtered.map((t) => {
                 const checked = value.includes(t.id)
@@ -1142,7 +1146,7 @@ function TagPicker({
                     key={t.id}
                     type="button"
                     onClick={() => toggleTag(t.id)}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-slate-50"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-accent"
                   >
                     <span
                       className="h-2 w-2 shrink-0 rounded-full"
@@ -1151,19 +1155,19 @@ function TagPicker({
                     <span
                       className={`flex-1 truncate text-left ${
                         checked
-                          ? 'font-semibold text-slate-950'
-                          : 'text-slate-700'
+                          ? 'font-semibold text-foreground'
+                          : 'text-foreground'
                       }`}
                     >
                       {t.name}
                     </span>
-                    {checked && <Check className="h-3.5 w-3.5 text-teal-600" />}
+                    {checked && <Check className="h-3.5 w-3.5 text-primary" />}
                   </button>
                 )
               })
             )}
           </div>
-          <div className="border-t border-slate-100 p-2">
+          <div className="border-t border-border p-2">
             {creating ? (
               <form onSubmit={handleCreate} className="grid gap-2">
                 <div className="flex gap-2">
@@ -1172,21 +1176,21 @@ function TagPicker({
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     placeholder="Tag name"
-                    className="h-8 flex-1 rounded-lg border border-slate-200 px-2 text-sm outline-none focus:border-teal-500"
+                    className="h-8 flex-1 rounded-lg border border-border bg-card text-foreground px-2 text-sm outline-none focus:border-primary"
                   />
                   <input
                     type="color"
                     value={newColor}
                     onChange={(e) => setNewColor(e.target.value)}
                     title="Pick a color"
-                    className="h-8 w-10 cursor-pointer rounded-lg border border-slate-200 p-0.5"
+                    className="h-8 w-10 cursor-pointer rounded-lg border border-border p-0.5"
                   />
                 </div>
                 <div className="flex gap-1.5">
                   <button
                     type="submit"
                     disabled={createPending || !newName.trim()}
-                    className="flex-1 rounded-lg bg-teal-700 py-1.5 text-xs font-bold text-white hover:bg-teal-800 disabled:bg-slate-200 disabled:text-slate-400"
+                    className="flex-1 rounded-lg bg-primary py-1.5 text-xs font-bold text-primary-foreground hover:brightness-110 disabled:bg-muted disabled:text-muted-foreground"
                   >
                     {createPending ? 'Creating…' : 'Create'}
                   </button>
@@ -1196,7 +1200,7 @@ function TagPicker({
                       setCreating(false)
                       setNewName('')
                     }}
-                    className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                    className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-accent"
                   >
                     Cancel
                   </button>
@@ -1206,7 +1210,7 @@ function TagPicker({
               <button
                 type="button"
                 onClick={() => setCreating(true)}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-50"
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15"
               >
                 <Plus className="h-3.5 w-3.5" />
                 New tag

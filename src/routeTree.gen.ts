@@ -14,6 +14,8 @@ import { Route as DemoPaymentRouteImport } from './routes/demo-payment'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthIndexRouteImport } from './routes/auth/index'
+import { Route as AuthResetPasswordRouteImport } from './routes/auth/reset-password'
+import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
 import { Route as AppProfileRouteImport } from './routes/app/profile'
 import { Route as AppTimeTrackerIndexRouteImport } from './routes/app/time-tracker/index'
 import { Route as AppWorkspaceSettingsRouteImport } from './routes/app/workspace/settings'
@@ -47,6 +49,16 @@ const IndexRoute = IndexRouteImport.update({
 const AuthIndexRoute = AuthIndexRouteImport.update({
   id: '/auth/',
   path: '/auth/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthResetPasswordRoute = AuthResetPasswordRouteImport.update({
+  id: '/auth/reset-password',
+  path: '/auth/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthForgotPasswordRoute = AuthForgotPasswordRouteImport.update({
+  id: '/auth/forgot-password',
+  path: '/auth/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppProfileRoute = AppProfileRouteImport.update({
@@ -101,6 +113,8 @@ export interface FileRoutesByFullPath {
   '/demo-payment': typeof DemoPaymentRoute
   '/lounge': typeof LoungeRoute
   '/app/profile': typeof AppProfileRoute
+  '/auth/forgot-password': typeof AuthForgotPasswordRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/': typeof AuthIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/time-tracker/day': typeof AppTimeTrackerDayRoute
@@ -117,6 +131,8 @@ export interface FileRoutesByTo {
   '/demo-payment': typeof DemoPaymentRoute
   '/lounge': typeof LoungeRoute
   '/app/profile': typeof AppProfileRoute
+  '/auth/forgot-password': typeof AuthForgotPasswordRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth': typeof AuthIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/time-tracker/day': typeof AppTimeTrackerDayRoute
@@ -134,6 +150,8 @@ export interface FileRoutesById {
   '/demo-payment': typeof DemoPaymentRoute
   '/lounge': typeof LoungeRoute
   '/app/profile': typeof AppProfileRoute
+  '/auth/forgot-password': typeof AuthForgotPasswordRoute
+  '/auth/reset-password': typeof AuthResetPasswordRoute
   '/auth/': typeof AuthIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/time-tracker/day': typeof AppTimeTrackerDayRoute
@@ -152,6 +170,8 @@ export interface FileRouteTypes {
     | '/demo-payment'
     | '/lounge'
     | '/app/profile'
+    | '/auth/forgot-password'
+    | '/auth/reset-password'
     | '/auth/'
     | '/api/auth/$'
     | '/app/time-tracker/day'
@@ -168,6 +188,8 @@ export interface FileRouteTypes {
     | '/demo-payment'
     | '/lounge'
     | '/app/profile'
+    | '/auth/forgot-password'
+    | '/auth/reset-password'
     | '/auth'
     | '/api/auth/$'
     | '/app/time-tracker/day'
@@ -184,6 +206,8 @@ export interface FileRouteTypes {
     | '/demo-payment'
     | '/lounge'
     | '/app/profile'
+    | '/auth/forgot-password'
+    | '/auth/reset-password'
     | '/auth/'
     | '/api/auth/$'
     | '/app/time-tracker/day'
@@ -200,6 +224,8 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   DemoPaymentRoute: typeof DemoPaymentRoute
   LoungeRoute: typeof LoungeRoute
+  AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
+  AuthResetPasswordRoute: typeof AuthResetPasswordRoute
   AuthIndexRoute: typeof AuthIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
@@ -239,6 +265,20 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth/'
       preLoaderRoute: typeof AuthIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/reset-password': {
+      id: '/auth/reset-password'
+      path: '/auth/reset-password'
+      fullPath: '/auth/reset-password'
+      preLoaderRoute: typeof AuthResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/forgot-password': {
+      id: '/auth/forgot-password'
+      path: '/auth/forgot-password'
+      fullPath: '/auth/forgot-password'
+      preLoaderRoute: typeof AuthForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/app/profile': {
@@ -336,6 +376,8 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   DemoPaymentRoute: DemoPaymentRoute,
   LoungeRoute: LoungeRoute,
+  AuthForgotPasswordRoute: AuthForgotPasswordRoute,
+  AuthResetPasswordRoute: AuthResetPasswordRoute,
   AuthIndexRoute: AuthIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }

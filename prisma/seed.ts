@@ -1,5 +1,7 @@
 import { PrismaClient } from '../src/generated/prisma/client.js'
 import { PrismaPg } from '@prisma/adapter-pg'
+import { auth } from '../src/lib/auth.js'
+import { DEV_CREDENTIALS } from '../src/lib/dev-credentials.js'
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL!,
@@ -47,26 +49,57 @@ async function main() {
   }
   console.log(`  Roles: ${[...roles.keys()].join(', ')}`)
 
-  // ─── Owner member ──────────────────────────────────────────────────────────
-  // Change this email to your own — when you sign up with this email,
-  // you will automatically be linked as the workspace Owner.
-  const ownerEmail = 'owner@mycompany.com'
+  // ─── Dev users + workspace members ─────────────────────────────────────────
+  // Seed real Better Auth users (for the /auth "Dev logins" popover) and
+  // link each to the workspace with the corresponding role.
+  console.log('  Seeding dev users:')
+  for (const cred of DEV_CREDENTIALS) {
+    const existing = await prisma.user.findUnique({ where: { email: cred.email } })
+    let userId = existing?.id
 
-  const ownerMember = await prisma.workspaceMember.upsert({
-    where: { workspaceId_email: { workspaceId: workspace.id, email: ownerEmail } },
-    update: { workspaceRoleId: roles.get('OWNER') },
-    create: {
-      workspaceId: workspace.id,
-      email: ownerEmail,
-      workspaceRoleId: roles.get('OWNER'),
-      status: 'INVITED',
-    },
-  })
-  console.log(`  Owner member: ${ownerEmail} (${ownerMember.id})`)
+    if (!existing) {
+      try {
+        const result = await auth.api.signUpEmail({
+          body: { name: cred.name, email: cred.email, password: cred.password },
+        })
+        userId = result.user.id
+        console.log(`    + Created auth user: ${cred.email} (${cred.roleLabel})`)
+      } catch (err) {
+        console.warn(
+          `    ! Could not create auth user for ${cred.email}:`,
+          err instanceof Error ? err.message : err,
+        )
+        continue
+      }
+    } else {
+      console.log(`    = Auth user exists: ${cred.email} (${cred.roleLabel})`)
+    }
 
-  console.log('\n✅ Done. Sign up with', ownerEmail, 'to access the workspace as Owner.')
-  console.log('   Then use the Catalogs screen to add projects, tags, departments, and cohorts.')
-  console.log('   Use the Members screen to invite additional employees.')
+    const roleId = roles.get(cred.permissionLevel)
+    if (!roleId) continue
+
+    await prisma.workspaceMember.upsert({
+      where: {
+        workspaceId_email: { workspaceId: workspace.id, email: cred.email },
+      },
+      update: {
+        workspaceRoleId: roleId,
+        userId: userId ?? null,
+        status: 'ACTIVE',
+      },
+      create: {
+        workspaceId: workspace.id,
+        email: cred.email,
+        workspaceRoleId: roleId,
+        userId: userId ?? null,
+        status: 'ACTIVE',
+      },
+    })
+  }
+
+  console.log('\n✅ Done. You can now sign in with any of the seeded credentials.')
+  console.log('   All dev accounts use password:', DEV_CREDENTIALS[0]?.password)
+  console.log('   In dev mode, use the "Dev logins" button on the /auth page for one-click sign in.')
 }
 
 main()
