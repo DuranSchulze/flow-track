@@ -42,6 +42,7 @@ type MemberStat = {
   entryCount: number
   thisWeekSeconds: number
   thisMonthSeconds: number
+  topProjects: Array<{ projectId: string; seconds: number }>
 }
 
 const PAGE_SIZE = 10
@@ -106,11 +107,13 @@ function IconBtn({
   title,
   children,
   variant = 'default',
+  className = '',
 }: {
   onClick: () => void
   title: string
   children: React.ReactNode
   variant?: 'default' | 'danger'
+  className?: string
 }) {
   const cls =
     variant === 'danger'
@@ -121,7 +124,7 @@ function IconBtn({
       type="button"
       onClick={onClick}
       title={title}
-      className={`p-1 ${cls}`}
+      className={`rounded p-1 transition-colors ${cls} ${className}`}
     >
       {children}
     </button>
@@ -880,6 +883,7 @@ function MemberRow({
   const cohorts = state.cohorts.filter((c) => member.cohortIds.includes(c.id))
 
   const [editing, setEditing] = useState(false)
+  const [showAnalytics, setShowAnalytics] = useState(false)
   const [roleId, setRoleId] = useState(member.workspaceRoleId)
   const [deptId, setDeptId] = useState(member.departmentId)
   const [cohortIds, setCohortIds] = useState<string[]>(member.cohortIds)
@@ -1023,68 +1027,154 @@ function MemberRow({
   }
 
   return (
-    <tr className="border-t border-border">
-      <td className="px-4 py-3">
-        <p className="m-0 font-semibold text-foreground">{member.name}</p>
-        <p className="m-0 mt-1 text-xs text-muted-foreground">{member.email}</p>
-      </td>
-      <td className="px-4 py-3">
-        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
-          <span
-            className="inline-block h-2.5 w-2.5 rounded-full"
-            style={{
-              backgroundColor:
-                state.roles.find((r) => r.id === member.workspaceRoleId)
-                  ?.color ?? '#94a3b8',
-            }}
-          />
-          {member.roleName}
-        </span>
-      </td>
-      <td className="px-4 py-3 text-foreground">
-        {department?.name || 'Unassigned'}
-      </td>
-      <td className="px-4 py-3 text-foreground">
-        {cohorts.map((c) => c.name).join(', ') || 'None'}
-      </td>
-      <td className="px-4 py-3">
-        <MemberStatusBadge status={member.status} />
-      </td>
-      {canManage && (
-        <>
-          <td className="px-4 py-3 text-right text-sm tabular-nums text-muted-foreground">
-            {formatHours(stats?.thisWeekSeconds ?? 0)}
-          </td>
-          <td className="px-4 py-3 text-right text-sm tabular-nums text-muted-foreground">
-            {formatHours(stats?.totalSeconds ?? 0)}
-          </td>
-          <td className="px-4 py-3 text-right text-sm tabular-nums text-muted-foreground">
-            {formatHours(stats?.billableSeconds ?? 0)}
-          </td>
-          <td className="px-4 py-3">
-            <div className="flex items-center gap-1">
-              <IconBtn onClick={() => setEditing(true)} title="Edit member">
-                <Pencil className="h-3.5 w-3.5" />
-              </IconBtn>
-              {!isSelf && (
-                <button
-                  type="button"
-                  onClick={handleToggleStatus}
-                  disabled={pending}
-                  className={`h-6 rounded px-2 text-xs font-semibold transition-colors disabled:opacity-50 ${
-                    member.status === 'DISABLED'
-                      ? 'bg-primary/15 text-primary hover:bg-primary/25'
-                      : 'bg-destructive/15 text-destructive hover:bg-destructive/25'
-                  }`}
+    <>
+      <tr className="border-t border-border">
+        <td className="px-4 py-3">
+          <p className="m-0 font-semibold text-foreground">{member.name}</p>
+          <p className="m-0 mt-1 text-xs text-muted-foreground">{member.email}</p>
+        </td>
+        <td className="px-4 py-3">
+          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-full"
+              style={{
+                backgroundColor:
+                  state.roles.find((r) => r.id === member.workspaceRoleId)
+                    ?.color ?? '#94a3b8',
+              }}
+            />
+            {member.roleName}
+          </span>
+        </td>
+        <td className="px-4 py-3 text-foreground">
+          {department?.name || 'Unassigned'}
+        </td>
+        <td className="px-4 py-3 text-foreground">
+          {cohorts.map((c) => c.name).join(', ') || 'None'}
+        </td>
+        <td className="px-4 py-3">
+          <MemberStatusBadge status={member.status} />
+        </td>
+        {canManage && (
+          <>
+            <td className="px-4 py-3 text-right text-sm tabular-nums text-muted-foreground">
+              {formatHours(stats?.thisWeekSeconds ?? 0)}
+            </td>
+            <td className="px-4 py-3 text-right text-sm tabular-nums text-muted-foreground">
+              {formatHours(stats?.totalSeconds ?? 0)}
+            </td>
+            <td className="px-4 py-3 text-right text-sm tabular-nums text-muted-foreground">
+              {formatHours(stats?.billableSeconds ?? 0)}
+            </td>
+            <td className="px-4 py-3">
+              <div className="flex items-center gap-1">
+                <IconBtn
+                  onClick={() => setShowAnalytics((v) => !v)}
+                  title="View analytics"
+                  className={showAnalytics ? 'bg-primary/10 text-primary' : ''}
                 >
-                  {member.status === 'DISABLED' ? 'Reactivate' : 'Disable'}
-                </button>
-              )}
+                  <BarChart2 className="h-3.5 w-3.5" />
+                </IconBtn>
+                <IconBtn onClick={() => setEditing(true)} title="Edit member">
+                  <Pencil className="h-3.5 w-3.5" />
+                </IconBtn>
+                {!isSelf && (
+                  <button
+                    type="button"
+                    onClick={handleToggleStatus}
+                    disabled={pending}
+                    className={`h-6 rounded px-2 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                      member.status === 'DISABLED'
+                        ? 'bg-primary/15 text-primary hover:bg-primary/25'
+                        : 'bg-destructive/15 text-destructive hover:bg-destructive/25'
+                    }`}
+                  >
+                    {member.status === 'DISABLED' ? 'Reactivate' : 'Disable'}
+                  </button>
+                )}
+              </div>
+            </td>
+          </>
+        )}
+      </tr>
+
+      {/* ── Expandable analytics panel ── */}
+      {canManage && showAnalytics && (
+        <tr className="border-t border-border bg-muted/40">
+          <td colSpan={9} className="px-5 pb-5 pt-3">
+            <p className="m-0 mb-3 text-xs font-bold uppercase tracking-wide text-primary">
+              Analytics — {member.name}
+            </p>
+
+            {/* Stats chips */}
+            <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+              {[
+                { label: 'This week', value: formatHours(stats?.thisWeekSeconds ?? 0) },
+                { label: 'This month', value: formatHours(stats?.thisMonthSeconds ?? 0) },
+                { label: 'All time', value: formatHours(stats?.totalSeconds ?? 0) },
+                { label: 'Billable', value: formatHours(stats?.billableSeconds ?? 0) },
+                { label: 'Entries', value: String(stats?.entryCount ?? 0) },
+              ].map((chip) => (
+                <div
+                  key={chip.label}
+                  className="rounded-lg border border-border bg-card px-3 py-2.5"
+                >
+                  <p className="m-0 text-xs text-muted-foreground">{chip.label}</p>
+                  <p className="m-0 mt-0.5 text-lg font-bold text-foreground">
+                    {chip.value}
+                  </p>
+                </div>
+              ))}
             </div>
+
+            {/* Top projects */}
+            {stats && stats.topProjects.length > 0 ? (
+              <div>
+                <p className="m-0 mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Top projects
+                </p>
+                <div className="grid gap-2">
+                  {stats.topProjects.map(({ projectId, seconds }) => {
+                    const project = state.projects.find((p) => p.id === projectId)
+                    const pct =
+                      stats.totalSeconds > 0
+                        ? Math.round((seconds / stats.totalSeconds) * 100)
+                        : 0
+                    return (
+                      <div key={projectId} className="flex items-center gap-3">
+                        <span
+                          className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: project?.color ?? '#94a3b8' }}
+                        />
+                        <span className="w-32 shrink-0 truncate text-sm text-foreground">
+                          {project?.name ?? 'Unknown'}
+                        </span>
+                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-border">
+                          <div
+                            className="h-2 rounded-full bg-primary transition-all"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                          {formatHours(seconds)}
+                        </span>
+                        <span className="w-8 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                          {pct}%
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <p className="m-0 text-sm text-muted-foreground">
+                No tracked entries yet.
+              </p>
+            )}
           </td>
-        </>
+        </tr>
       )}
-    </tr>
+    </>
   )
 }
 

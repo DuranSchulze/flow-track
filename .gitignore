@@ -45,6 +45,8 @@ coverage
 # Local tools and OS files
 .DS_Store
 .idea
+.vscode
+.windsurf
 
 # Local task state
 todos.json

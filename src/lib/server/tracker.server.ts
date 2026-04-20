@@ -776,6 +776,7 @@ export type MemberStat = {
   entryCount: number
   thisWeekSeconds: number
   thisMonthSeconds: number
+  topProjects: Array<{ projectId: string; seconds: number }>
 }
 
 export async function getMemberAnalytics(): Promise<MemberStat[]> {
@@ -798,10 +799,14 @@ export async function getMemberAnalytics(): Promise<MemberStat[]> {
       durationSeconds: true,
       billable: true,
       startedAt: true,
+      projectId: true,
     },
   })
 
-  const statsMap: Record<string, MemberStat> = {}
+  const statsMap: Record<
+    string,
+    Omit<MemberStat, 'topProjects'> & { projectSeconds: Record<string, number> }
+  > = {}
 
   for (const entry of entries) {
     const id = entry.workspaceMemberId
@@ -813,6 +818,7 @@ export async function getMemberAnalytics(): Promise<MemberStat[]> {
         entryCount: 0,
         thisWeekSeconds: 0,
         thisMonthSeconds: 0,
+        projectSeconds: {},
       }
     }
     const s = statsMap[id]
@@ -823,9 +829,19 @@ export async function getMemberAnalytics(): Promise<MemberStat[]> {
     const entryStart = new Date(entry.startedAt)
     if (entryStart >= weekStart) s.thisWeekSeconds += secs
     if (entryStart >= monthStart) s.thisMonthSeconds += secs
+    if (entry.projectId) {
+      s.projectSeconds[entry.projectId] =
+        (s.projectSeconds[entry.projectId] ?? 0) + secs
+    }
   }
 
-  return Object.values(statsMap)
+  return Object.values(statsMap).map(({ projectSeconds, ...rest }) => ({
+    ...rest,
+    topProjects: Object.entries(projectSeconds)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([projectId, seconds]) => ({ projectId, seconds })),
+  }))
 }
 
 export const trackerSchemas = {
