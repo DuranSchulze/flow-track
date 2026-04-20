@@ -767,6 +767,67 @@ export async function updateWorkspaceSettings(data: z.infer<typeof updateWorkspa
   })
 }
 
+// ─── Member analytics (owner/admin only) ─────────────────────────────────────
+
+export type MemberStat = {
+  memberId: string
+  totalSeconds: number
+  billableSeconds: number
+  entryCount: number
+  thisWeekSeconds: number
+  thisMonthSeconds: number
+}
+
+export async function getMemberAnalytics(): Promise<MemberStat[]> {
+  const access = await requireWorkspaceAccess()
+  assertOwnerOrAdmin(access)
+
+  const now = new Date()
+
+  const weekStart = new Date(now)
+  weekStart.setHours(0, 0, 0, 0)
+  const dayOfWeek = weekStart.getDay()
+  weekStart.setDate(weekStart.getDate() + (dayOfWeek === 0 ? -6 : 1 - dayOfWeek))
+
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+  const entries = await prisma.timeEntry.findMany({
+    where: { workspaceId: access.workspace.id, endedAt: { not: null } },
+    select: {
+      workspaceMemberId: true,
+      durationSeconds: true,
+      billable: true,
+      startedAt: true,
+    },
+  })
+
+  const statsMap: Record<string, MemberStat> = {}
+
+  for (const entry of entries) {
+    const id = entry.workspaceMemberId
+    if (!statsMap[id]) {
+      statsMap[id] = {
+        memberId: id,
+        totalSeconds: 0,
+        billableSeconds: 0,
+        entryCount: 0,
+        thisWeekSeconds: 0,
+        thisMonthSeconds: 0,
+      }
+    }
+    const s = statsMap[id]
+    const secs = entry.durationSeconds
+    s.totalSeconds += secs
+    s.entryCount++
+    if (entry.billable) s.billableSeconds += secs
+    const entryStart = new Date(entry.startedAt)
+    if (entryStart >= weekStart) s.thisWeekSeconds += secs
+    if (entryStart >= monthStart) s.thisMonthSeconds += secs
+  }
+
+  return Object.values(statsMap)
+}
+
 export const trackerSchemas = {
   entryInputSchema,
   startTimerSchema,

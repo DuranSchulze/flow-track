@@ -46,6 +46,13 @@ export const getTrackerStateFn = createServerFn({ method: 'GET' }).handler(
   },
 )
 
+export const getMemberAnalyticsFn = createServerFn({ method: 'GET' }).handler(
+  async () => {
+    const { getMemberAnalytics } = await import('./tracker.server')
+    return getMemberAnalytics()
+  },
+)
+
 export const startTimerFn = createServerFn({ method: 'POST' })
   .inputValidator((input) => startTimerSchema.parse(input))
   .handler(async ({ data }) => {

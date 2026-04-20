@@ -1,6 +1,20 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from '@tanstack/react-router'
-import { KeyRound, Pencil, Plus, Trash2, UserPlus, X } from 'lucide-react'
+import {
+  BarChart2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  DollarSign,
+  KeyRound,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  UserPlus,
+  X,
+} from 'lucide-react'
+import { formatHours } from '#/lib/time-tracker/store'
 import { gooeyToast } from 'goey-toast'
 import { authClient } from '#/lib/auth-client'
 import {
@@ -20,6 +34,17 @@ import {
   updateWorkspaceSettingsFn,
 } from '#/lib/server/tracker'
 import type { TrackerState } from '#/lib/time-tracker/types'
+
+type MemberStat = {
+  memberId: string
+  totalSeconds: number
+  billableSeconds: number
+  entryCount: number
+  thisWeekSeconds: number
+  thisMonthSeconds: number
+}
+
+const PAGE_SIZE = 10
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -449,7 +474,13 @@ export function ProfileScreen({ state }: { state: TrackerState }) {
 
 // ─── MembersScreen ────────────────────────────────────────────────────────────
 
-export function MembersScreen({ state }: { state: TrackerState }) {
+export function MembersScreen({
+  state,
+  memberStats = [],
+}: {
+  state: TrackerState
+  memberStats?: MemberStat[]
+}) {
   const router = useRouter()
   const currentMember = state.members.find(
     (m) => m.id === state.currentMemberId,
@@ -458,6 +489,7 @@ export function MembersScreen({ state }: { state: TrackerState }) {
     currentMember.permissionLevel === 'OWNER' ||
     currentMember.permissionLevel === 'ADMIN'
 
+  // ── Add member form ──
   const [showForm, setShowForm] = useState(false)
   const [email, setEmail] = useState('')
   const [workspaceRoleId, setWorkspaceRoleId] = useState(
@@ -465,6 +497,64 @@ export function MembersScreen({ state }: { state: TrackerState }) {
   )
   const [departmentId, setDepartmentId] = useState('')
   const [pending, setPending] = useState(false)
+
+  // ── Search / filter / pagination ──
+  const [search, setSearch] = useState('')
+  const [filterRole, setFilterRole] = useState('')
+  const [filterDept, setFilterDept] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
+  const [page, setPage] = useState(0)
+
+  // ── Analytics lookup map ──
+  const statsMap = useMemo(() => {
+    const map = new Map<string, MemberStat>()
+    for (const s of memberStats) map.set(s.memberId, s)
+    return map
+  }, [memberStats])
+
+  // ── Workspace-wide summary (owner view) ──
+  const workspaceSummary = useMemo(() => {
+    if (!canManage || memberStats.length === 0) return null
+    return memberStats.reduce(
+      (acc, s) => ({
+        thisWeekSeconds: acc.thisWeekSeconds + s.thisWeekSeconds,
+        totalSeconds: acc.totalSeconds + s.totalSeconds,
+        billableSeconds: acc.billableSeconds + s.billableSeconds,
+        entryCount: acc.entryCount + s.entryCount,
+      }),
+      { thisWeekSeconds: 0, totalSeconds: 0, billableSeconds: 0, entryCount: 0 },
+    )
+  }, [memberStats, canManage])
+
+  // ── Filtered members ──
+  const filteredMembers = useMemo(() => {
+    return state.members.filter((m) => {
+      if (search) {
+        const q = search.toLowerCase()
+        if (
+          !m.name.toLowerCase().includes(q) &&
+          !m.email.toLowerCase().includes(q)
+        )
+          return false
+      }
+      if (filterRole && m.workspaceRoleId !== filterRole) return false
+      if (filterDept && m.departmentId !== filterDept) return false
+      if (filterStatus && m.status !== filterStatus) return false
+      return true
+    })
+  }, [state.members, search, filterRole, filterDept, filterStatus])
+
+  const totalPages = Math.ceil(filteredMembers.length / PAGE_SIZE)
+  const pagedMembers = useMemo(
+    () => filteredMembers.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    [filteredMembers, page],
+  )
+
+  function resetPage() {
+    setPage(0)
+  }
+
+  const hasActiveFilters = search || filterRole || filterDept || filterStatus
 
   async function handleAddMember(event: React.FormEvent) {
     event.preventDefault()
@@ -496,7 +586,34 @@ export function MembersScreen({ state }: { state: TrackerState }) {
 
   return (
     <Page title="Workspace members" eyebrow="Owner/Admin">
+      {/* ── Analytics summary (owner/admin only) ── */}
+      {canManage && workspaceSummary && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <AnalyticCard
+            icon={<Clock className="h-4 w-4" />}
+            label="This week"
+            value={formatHours(workspaceSummary.thisWeekSeconds)}
+          />
+          <AnalyticCard
+            icon={<BarChart2 className="h-4 w-4" />}
+            label="Total tracked"
+            value={formatHours(workspaceSummary.totalSeconds)}
+          />
+          <AnalyticCard
+            icon={<DollarSign className="h-4 w-4" />}
+            label="Billable"
+            value={formatHours(workspaceSummary.billableSeconds)}
+          />
+          <AnalyticCard
+            icon={<UserPlus className="h-4 w-4" />}
+            label="Total entries"
+            value={String(workspaceSummary.entryCount)}
+          />
+        </div>
+      )}
+
       <section className="rounded-lg border border-border bg-card shadow-sm">
+        {/* ── Header ── */}
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border p-4">
           <div>
             <h2 className="m-0 text-lg font-bold text-foreground">
@@ -523,6 +640,7 @@ export function MembersScreen({ state }: { state: TrackerState }) {
           )}
         </div>
 
+        {/* ── Add member form ── */}
         {showForm && (
           <form
             onSubmit={handleAddMember}
@@ -581,6 +699,66 @@ export function MembersScreen({ state }: { state: TrackerState }) {
           </form>
         )}
 
+        {/* ── Search & filter bar ── */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="search"
+              placeholder="Search by name or email…"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); resetPage() }}
+              className="h-9 w-full rounded-lg border border-border bg-card pl-8 pr-3 text-sm text-foreground outline-none focus:border-primary"
+            />
+          </div>
+          <select
+            value={filterRole}
+            onChange={(e) => { setFilterRole(e.target.value); resetPage() }}
+            className="h-9 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-primary"
+          >
+            <option value="">All roles</option>
+            {state.roles.map((r) => (
+              <option key={r.id} value={r.id}>{r.name}</option>
+            ))}
+          </select>
+          <select
+            value={filterDept}
+            onChange={(e) => { setFilterDept(e.target.value); resetPage() }}
+            className="h-9 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-primary"
+          >
+            <option value="">All departments</option>
+            {state.departments.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+          <select
+            value={filterStatus}
+            onChange={(e) => { setFilterStatus(e.target.value); resetPage() }}
+            className="h-9 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-primary"
+          >
+            <option value="">All statuses</option>
+            <option value="ACTIVE">Active</option>
+            <option value="INVITED">Invited</option>
+            <option value="DISABLED">Disabled</option>
+          </select>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('')
+                setFilterRole('')
+                setFilterDept('')
+                setFilterStatus('')
+                resetPage()
+              }}
+              className="h-9 rounded-lg border border-border px-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        {/* ── Members table ── */}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] border-collapse text-left text-sm">
             <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
@@ -590,24 +768,97 @@ export function MembersScreen({ state }: { state: TrackerState }) {
                 <th className="px-4 py-3">Department</th>
                 <th className="px-4 py-3">Groups / cohorts</th>
                 <th className="px-4 py-3">Status</th>
-                {canManage && <th className="px-4 py-3" />}
+                {canManage && (
+                  <>
+                    <th className="px-4 py-3 text-right">This week</th>
+                    <th className="px-4 py-3 text-right">Total</th>
+                    <th className="px-4 py-3 text-right">Billable</th>
+                    <th className="px-4 py-3" />
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
-              {state.members.map((member) => (
-                <MemberRow
-                  key={member.id}
-                  member={member}
-                  state={state}
-                  canManage={canManage}
-                  isSelf={member.id === state.currentMemberId}
-                />
-              ))}
+              {pagedMembers.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={canManage ? 9 : 5}
+                    className="px-4 py-8 text-center text-sm text-muted-foreground"
+                  >
+                    No members match your search.
+                  </td>
+                </tr>
+              ) : (
+                pagedMembers.map((member) => (
+                  <MemberRow
+                    key={member.id}
+                    member={member}
+                    state={state}
+                    canManage={canManage}
+                    isSelf={member.id === state.currentMemberId}
+                    stats={statsMap.get(member.id)}
+                  />
+                ))
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* ── Pagination ── */}
+        {filteredMembers.length > PAGE_SIZE && (
+          <div className="flex items-center justify-between border-t border-border px-4 py-3">
+            <span className="text-sm text-muted-foreground">
+              Showing {page * PAGE_SIZE + 1}–
+              {Math.min((page + 1) * PAGE_SIZE, filteredMembers.length)} of{' '}
+              {filteredMembers.length} members
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setPage((p) => p - 1)}
+                disabled={page === 0}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="min-w-[60px] text-center text-sm text-foreground">
+                {page + 1} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={page >= totalPages - 1}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </section>
     </Page>
+  )
+}
+
+function AnalyticCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: string
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <div className="mb-2 flex items-center gap-2 text-muted-foreground">
+        {icon}
+        <span className="text-xs font-semibold uppercase tracking-wide">
+          {label}
+        </span>
+      </div>
+      <p className="m-0 text-2xl font-bold text-foreground">{value}</p>
+    </div>
   )
 }
 
@@ -616,11 +867,13 @@ function MemberRow({
   state,
   canManage,
   isSelf,
+  stats,
 }: {
   member: TrackerState['members'][number]
   state: TrackerState
   canManage: boolean
   isSelf: boolean
+  stats?: MemberStat
 }) {
   const router = useRouter()
   const department = state.departments.find((d) => d.id === member.departmentId)
@@ -737,6 +990,15 @@ function MemberRow({
         <td className="px-4 py-3">
           <MemberStatusBadge status={member.status} />
         </td>
+        <td className="px-4 py-3 text-right text-sm text-muted-foreground">
+          {formatHours(stats?.thisWeekSeconds ?? 0)}
+        </td>
+        <td className="px-4 py-3 text-right text-sm text-muted-foreground">
+          {formatHours(stats?.totalSeconds ?? 0)}
+        </td>
+        <td className="px-4 py-3 text-right text-sm text-muted-foreground">
+          {formatHours(stats?.billableSeconds ?? 0)}
+        </td>
         <td className="px-4 py-3">
           <div className="flex gap-1">
             <button
@@ -789,27 +1051,38 @@ function MemberRow({
         <MemberStatusBadge status={member.status} />
       </td>
       {canManage && (
-        <td className="px-4 py-3">
-          <div className="flex items-center gap-1">
-            <IconBtn onClick={() => setEditing(true)} title="Edit member">
-              <Pencil className="h-3.5 w-3.5" />
-            </IconBtn>
-            {!isSelf && (
-              <button
-                type="button"
-                onClick={handleToggleStatus}
-                disabled={pending}
-                className={`h-6 rounded px-2 text-xs font-semibold transition-colors disabled:opacity-50 ${
-                  member.status === 'DISABLED'
-                    ? 'bg-primary/15 text-primary hover:bg-primary/25'
-                    : 'bg-destructive/15 text-destructive hover:bg-destructive/25'
-                }`}
-              >
-                {member.status === 'DISABLED' ? 'Reactivate' : 'Disable'}
-              </button>
-            )}
-          </div>
-        </td>
+        <>
+          <td className="px-4 py-3 text-right text-sm tabular-nums text-muted-foreground">
+            {formatHours(stats?.thisWeekSeconds ?? 0)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm tabular-nums text-muted-foreground">
+            {formatHours(stats?.totalSeconds ?? 0)}
+          </td>
+          <td className="px-4 py-3 text-right text-sm tabular-nums text-muted-foreground">
+            {formatHours(stats?.billableSeconds ?? 0)}
+          </td>
+          <td className="px-4 py-3">
+            <div className="flex items-center gap-1">
+              <IconBtn onClick={() => setEditing(true)} title="Edit member">
+                <Pencil className="h-3.5 w-3.5" />
+              </IconBtn>
+              {!isSelf && (
+                <button
+                  type="button"
+                  onClick={handleToggleStatus}
+                  disabled={pending}
+                  className={`h-6 rounded px-2 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                    member.status === 'DISABLED'
+                      ? 'bg-primary/15 text-primary hover:bg-primary/25'
+                      : 'bg-destructive/15 text-destructive hover:bg-destructive/25'
+                  }`}
+                >
+                  {member.status === 'DISABLED' ? 'Reactivate' : 'Disable'}
+                </button>
+              )}
+            </div>
+          </td>
+        </>
       )}
     </tr>
   )
