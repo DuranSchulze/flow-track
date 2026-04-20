@@ -17,9 +17,10 @@ import {
 } from 'lucide-react'
 import {
   dateTimeLocalValue,
-  formatDuration,
+  formatDurationPrecise,
   formatHours,
   getEntrySeconds,
+  getEntrySecondsPrecise,
   getViewRange,
   useFilteredEntries,
 } from '#/lib/time-tracker/store'
@@ -112,6 +113,38 @@ export function TimeTrackerDashboard({
   const [showFilters, setShowFilters] = useState(false)
 
   const [pending, setPending] = useState(false)
+
+  // ── Description autocomplete ──
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const descriptionWrapperRef = useRef<HTMLDivElement>(null)
+
+  const descriptionSuggestions = useMemo(() => {
+    if (!timerDescription.trim()) return []
+    const query = timerDescription.toLowerCase()
+    const seen = new Set<string>()
+    return state.entries
+      .map((e) => e.description)
+      .filter((desc) => {
+        const lower = desc.toLowerCase()
+        if (!lower.includes(query) || seen.has(lower)) return false
+        seen.add(lower)
+        return true
+      })
+      .slice(0, 8)
+  }, [timerDescription, state.entries])
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        descriptionWrapperRef.current &&
+        !descriptionWrapperRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   useEffect(() => {
     const interval = window.setInterval(() => setTick(Date.now()), 1000)
@@ -391,14 +424,41 @@ export function TimeTrackerDashboard({
           {inputMode === 'timer' && (
             <div className="grid gap-3">
               <div className="grid gap-3 lg:grid-cols-[1fr_200px_200px_130px]">
-                <input
-                  value={timerDescription}
-                  onChange={(e) => setTimerDescription(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && startTimer()}
-                  placeholder="What are you working on?"
-                  disabled={!!activeEntry}
-                  className="h-11 rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary disabled:bg-muted disabled:text-muted-foreground"
-                />
+                <div ref={descriptionWrapperRef} className="relative">
+                  <input
+                    value={timerDescription}
+                    onChange={(e) => {
+                      setTimerDescription(e.target.value)
+                      setShowSuggestions(true)
+                    }}
+                    onFocus={() => setShowSuggestions(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') startTimer()
+                      if (e.key === 'Escape') setShowSuggestions(false)
+                    }}
+                    placeholder="What are you working on?"
+                    disabled={!!activeEntry}
+                    className="h-11 w-full rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary disabled:bg-muted disabled:text-muted-foreground"
+                  />
+                  {showSuggestions && descriptionSuggestions.length > 0 && !activeEntry && (
+                    <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+                      {descriptionSuggestions.map((desc) => (
+                        <button
+                          key={desc}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            setTimerDescription(desc)
+                            setShowSuggestions(false)
+                          }}
+                          className="flex w-full items-center px-3 py-2.5 text-left text-sm text-foreground hover:bg-accent"
+                        >
+                          {desc}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <ProjectPicker
                   projects={state.projects}
                   value={timerProjectId}
@@ -454,9 +514,7 @@ export function TimeTrackerDashboard({
                     <p className="m-0 font-bold text-foreground">
                       {activeEntry.description}
                     </p>
-                    <p className="m-0 font-mono text-2xl font-bold text-foreground">
-                      {formatDuration(getEntrySeconds(activeEntry, tick))}
-                    </p>
+                    <RunningTimer entry={activeEntry} />
                   </div>
                 </div>
               )}
@@ -708,8 +766,10 @@ export function TimeTrackerDashboard({
                           {entry.billable ? 'Billable' : '—'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 font-mono font-bold text-foreground">
-                        {formatDuration(getEntrySeconds(entry, tick))}
+                      <td className="px-4 py-3 font-mono font-bold tabular-nums text-foreground">
+                        {formatDurationPrecise(
+                          getEntrySecondsPrecise(entry, tick),
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">
@@ -773,6 +833,21 @@ export function TimeTrackerDashboard({
         </div>
       </section>
     </div>
+  )
+}
+
+function RunningTimer({ entry }: { entry: TimeEntry }) {
+  const [tick, setTick] = useState(() => Date.now())
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setTick(Date.now()), 50)
+    return () => window.clearInterval(interval)
+  }, [])
+
+  return (
+    <p className="m-0 font-mono text-2xl font-bold tabular-nums text-foreground">
+      {formatDurationPrecise(getEntrySecondsPrecise(entry, tick))}
+    </p>
   )
 }
 

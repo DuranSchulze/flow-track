@@ -21,6 +21,26 @@ export function formatDuration(seconds: number) {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`
 }
 
+// Like formatDuration, but accepts fractional seconds and appends
+// centisecond precision (HH:MM:SS.CC) for live timer displays.
+export function formatDurationPrecise(seconds: number) {
+  const safe = Math.max(0, seconds)
+  const totalMs = Math.floor(safe * 1000)
+  const hours = Math.floor(totalMs / 3_600_000)
+  const minutes = Math.floor((totalMs % 3_600_000) / 60_000)
+  const secs = Math.floor((totalMs % 60_000) / 1000)
+  const centis = Math.floor((totalMs % 1000) / 10)
+
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(centis).padStart(2, '0')}`
+}
+
+export function getEntrySecondsPrecise(entry: TimeEntry, tick = Date.now()) {
+  if (entry.endedAt) {
+    return entry.durationSeconds
+  }
+  return Math.max(0, (tick - new Date(entry.startedAt).getTime()) / 1000)
+}
+
 export function formatHours(seconds: number) {
   return `${(seconds / 3600).toFixed(2)}h`
 }
