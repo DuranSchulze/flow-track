@@ -47,6 +47,7 @@ coverage
 .idea
 .vscode
 .windsurf
+/plans-idea
 
 # Local task state
 todos.json
