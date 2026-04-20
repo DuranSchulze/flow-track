@@ -4,6 +4,7 @@ import { getTrackerStateFn } from '#/lib/server/tracker'
 
 export const Route = createFileRoute('/app/workspace/catalogs')({
   loader: () => getTrackerStateFn(),
+  staleTime: 30_000,
   component: CatalogsRoute,
 })
 
