@@ -186,6 +186,8 @@ model Workspace {
   name        String             @db.VarChar(150)
   slug        String             @unique @db.VarChar(120)
   timezone    String             @default("Asia/Manila") @db.VarChar(80)
+  defaultBillableRate Decimal    @default(0) @map("default_billable_rate") @db.Decimal(12, 2)
+  billableCurrency    String     @default("PHP") @map("billable_currency") @db.VarChar(8)
   createdAt   DateTime           @default(now()) @map("created_at")
   updatedAt   DateTime           @updatedAt @map("updated_at")
   members     WorkspaceMember[]
@@ -252,6 +254,7 @@ model WorkspaceMember {
   workspaceRoleId String?           @map("workspace_role_id") @db.VarChar(30)
   workspaceRole   WorkspaceRole?    @relation(fields: [workspaceRoleId], references: [id], onDelete: SetNull)
   status          MemberStatus      @default(INVITED)
+  billableRate    Decimal?          @map("billable_rate") @db.Decimal(12, 2)
   departmentId    String?           @map("department_id") @db.VarChar(30)
   department      Department?       @relation("DepartmentMembers", fields: [departmentId], references: [id], onDelete: SetNull)
   employeeProfile EmployeeProfile?

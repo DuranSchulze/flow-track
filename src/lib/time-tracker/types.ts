@@ -6,6 +6,8 @@ export type Workspace = {
   id: string
   name: string
   timezone: string
+  defaultBillableRate: number
+  billableCurrency: string
 }
 
 export type WorkspaceRole = {
@@ -48,6 +50,7 @@ export type Member = {
   departmentId: string
   cohortIds: string[]
   status: 'ACTIVE' | 'INVITED' | 'DISABLED'
+  billableRate: number | null
 }
 
 export type TimeEntry = {

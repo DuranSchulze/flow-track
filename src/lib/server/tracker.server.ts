@@ -143,6 +143,8 @@ export async function getTrackerState(): Promise<TrackerState> {
         id: access.workspace.id,
         name: access.workspace.name,
         timezone: access.workspace.timezone,
+        defaultBillableRate: Number(access.workspace.defaultBillableRate),
+        billableCurrency: access.workspace.billableCurrency,
       },
       currentMemberId: memberId,
       roles: roles.map((role) => ({
@@ -180,6 +182,7 @@ export async function getTrackerState(): Promise<TrackerState> {
         departmentId: member.departmentId ?? '',
         cohortIds: member.cohorts.map((cohortMember) => cohortMember.cohortId),
         status: member.status,
+        billableRate: member.billableRate == null ? null : Number(member.billableRate),
       })),
       entries: entries.map((entry) => ({
         id: entry.id,
@@ -712,16 +715,44 @@ export async function setMemberStatus(data: z.infer<typeof setMemberStatusSchema
 
 // ─── Profile update ───────────────────────────────────────────────────────────
 
+const addressSchema = z.object({
+  buildingNo: z.string().trim().max(50).optional().or(z.literal('')),
+  street: z.string().trim().max(100).optional().or(z.literal('')),
+  city: z.string().trim().max(100).optional().or(z.literal('')),
+  province: z.string().trim().max(100).optional().or(z.literal('')),
+  postalCode: z.string().trim().max(20).optional().or(z.literal('')),
+  country: z.string().trim().max(100).default('Philippines'),
+})
+
 const updateProfileSchema = z.object({
   name: z.string().trim().min(1).max(150),
   firstName: z.string().trim().min(1).max(50),
+  middleName: z.string().trim().max(50).optional().or(z.literal('')),
   lastName: z.string().trim().min(1).max(50),
-  contactNumber: z.string().trim().max(50).optional(),
+  contactNumber: z.string().trim().max(50).optional().or(z.literal('')),
+  birthDate: z.string().date().optional().or(z.literal('')),
+  gender: z.enum(['MALE', 'FEMALE', 'NON_BINARY', 'PREFER_NOT_TO_SAY']).optional().or(z.literal('')),
+  maritalStatus: z
+    .enum(['SINGLE', 'MARRIED', 'SEPARATED', 'WIDOWED', 'DIVORCED'])
+    .optional()
+    .or(z.literal('')),
   avatarUrl: z.string().url().max(500).optional().or(z.literal('')),
+  address: addressSchema.optional(),
 })
+
+function emptyToNull<T extends string | undefined>(v: T): string | null {
+  if (v === undefined || v === '') return null
+  return v
+}
 
 export async function updateProfile(data: z.infer<typeof updateProfileSchema>) {
   const access = await requireWorkspaceAccess()
+
+  const birthDate = data.birthDate ? new Date(data.birthDate) : null
+  const gender = data.gender ? (data.gender as 'MALE' | 'FEMALE' | 'NON_BINARY' | 'PREFER_NOT_TO_SAY') : null
+  const maritalStatus = data.maritalStatus
+    ? (data.maritalStatus as 'SINGLE' | 'MARRIED' | 'SEPARATED' | 'WIDOWED' | 'DIVORCED')
+    : null
 
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
@@ -729,20 +760,52 @@ export async function updateProfile(data: z.infer<typeof updateProfileSchema>) {
       data: { name: data.name, image: data.avatarUrl || null },
     })
 
-    await tx.userProfile.upsert({
+    const profile = await tx.userProfile.upsert({
       where: { userId: access.user.id },
       create: {
         userId: access.user.id,
         firstName: data.firstName,
+        middleName: emptyToNull(data.middleName),
         lastName: data.lastName,
-        contactNumber: data.contactNumber,
+        contactNumber: emptyToNull(data.contactNumber),
+        birthDate,
+        gender,
+        maritalStatus,
       },
       update: {
         firstName: data.firstName,
+        middleName: emptyToNull(data.middleName),
         lastName: data.lastName,
-        contactNumber: data.contactNumber,
+        contactNumber: emptyToNull(data.contactNumber),
+        birthDate,
+        gender,
+        maritalStatus,
       },
     })
+
+    if (data.address) {
+      const a = data.address
+      await tx.userAddress.upsert({
+        where: { userProfileId: profile.id },
+        create: {
+          userProfileId: profile.id,
+          buildingNo: emptyToNull(a.buildingNo),
+          street: emptyToNull(a.street),
+          city: emptyToNull(a.city),
+          province: emptyToNull(a.province),
+          postalCode: emptyToNull(a.postalCode),
+          country: a.country || 'Philippines',
+        },
+        update: {
+          buildingNo: emptyToNull(a.buildingNo),
+          street: emptyToNull(a.street),
+          city: emptyToNull(a.city),
+          province: emptyToNull(a.province),
+          postalCode: emptyToNull(a.postalCode),
+          country: a.country || 'Philippines',
+        },
+      })
+    }
   })
 }
 
