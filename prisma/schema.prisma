@@ -182,12 +182,12 @@ model Verification {
 }
 
 model Workspace {
-  id          String            @id @default(cuid()) @db.VarChar(30)
-  name        String            @db.VarChar(150)
-  slug        String            @unique @db.VarChar(120)
-  timezone    String            @default("Asia/Manila") @db.VarChar(80)
-  createdAt   DateTime          @default(now()) @map("created_at")
-  updatedAt   DateTime          @updatedAt @map("updated_at")
+  id          String             @id @default(cuid()) @db.VarChar(30)
+  name        String             @db.VarChar(150)
+  slug        String             @unique @db.VarChar(120)
+  timezone    String             @default("Asia/Manila") @db.VarChar(80)
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
   members     WorkspaceMember[]
   roles       WorkspaceRole[]
   departments Department[]
@@ -195,8 +195,34 @@ model Workspace {
   projects    Project[]
   tags        Tag[]
   timeEntries TimeEntry[]
+  invites     WorkspaceInvite[]
 
   @@map("workspaces")
+}
+
+model WorkspaceInvite {
+  id              String           @id @default(cuid()) @db.VarChar(30)
+  workspaceId     String           @map("workspace_id") @db.VarChar(30)
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  email           String           @db.VarChar(255)
+  workspaceRoleId String?          @map("workspace_role_id") @db.VarChar(30)
+  workspaceRole   WorkspaceRole?   @relation(fields: [workspaceRoleId], references: [id], onDelete: SetNull)
+  departmentId    String?          @map("department_id") @db.VarChar(30)
+  department      Department?      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  invitedById     String?          @map("invited_by_id") @db.VarChar(30)
+  invitedBy       WorkspaceMember? @relation("InviteSender", fields: [invitedById], references: [id], onDelete: SetNull)
+  tokenHash       String           @unique @map("token_hash") @db.VarChar(128)
+  expiresAt       DateTime         @map("expires_at")
+  acceptedAt      DateTime?        @map("accepted_at")
+  revokedAt       DateTime?        @map("revoked_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, email])
+  @@index([workspaceId])
+  @@index([invitedById])
+  @@index([departmentId])
+  @@map("workspace_invites")
 }
 
 model WorkspaceRole {
@@ -207,6 +233,7 @@ model WorkspaceRole {
   permissionLevel RolePermission    @default(EMPLOYEE) @map("permission_level")
   color           String            @default("#6366f1") @db.VarChar(20)
   members         WorkspaceMember[]
+  invites         WorkspaceInvite[]
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
 
@@ -232,6 +259,7 @@ model WorkspaceMember {
   invitedById     String?           @map("invited_by_id") @db.VarChar(30)
   invitedBy       WorkspaceMember?  @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
   invitees        WorkspaceMember[] @relation("InvitedBy")
+  sentInvites     WorkspaceInvite[] @relation("InviteSender")
   ledDepartments  Department[]      @relation("DepartmentHead")
   cohorts         CohortMember[]
   createdAt       DateTime          @default(now()) @map("created_at")
@@ -255,6 +283,7 @@ model Department {
   headMemberId String?           @map("head_member_id") @db.VarChar(30)
   head         WorkspaceMember?  @relation("DepartmentHead", fields: [headMemberId], references: [id], onDelete: SetNull)
   members      WorkspaceMember[] @relation("DepartmentMembers")
+  invites      WorkspaceInvite[]
   createdAt    DateTime          @default(now()) @map("created_at")
   updatedAt    DateTime          @updatedAt @map("updated_at")
 

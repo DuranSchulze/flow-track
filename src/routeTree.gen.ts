@@ -9,11 +9,13 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as LoungeRouteImport } from './routes/lounge'
 import { Route as DemoPaymentRouteImport } from './routes/demo-payment'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthIndexRouteImport } from './routes/auth/index'
+import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as AuthResetPasswordRouteImport } from './routes/auth/reset-password'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
 import { Route as AppProfileRouteImport } from './routes/app/profile'
@@ -26,6 +28,11 @@ import { Route as AppTimeTrackerMonthRouteImport } from './routes/app/time-track
 import { Route as AppTimeTrackerDayRouteImport } from './routes/app/time-tracker/day'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoungeRoute = LoungeRouteImport.update({
   id: '/lounge',
   path: '/lounge',
@@ -49,6 +56,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuthIndexRoute = AuthIndexRouteImport.update({
   id: '/auth/',
   path: '/auth/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthResetPasswordRoute = AuthResetPasswordRouteImport.update({
@@ -112,9 +124,11 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRouteWithChildren
   '/demo-payment': typeof DemoPaymentRoute
   '/lounge': typeof LoungeRoute
+  '/onboarding': typeof OnboardingRoute
   '/app/profile': typeof AppProfileRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/auth/': typeof AuthIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/time-tracker/day': typeof AppTimeTrackerDayRoute
@@ -130,9 +144,11 @@ export interface FileRoutesByTo {
   '/app': typeof AppRouteWithChildren
   '/demo-payment': typeof DemoPaymentRoute
   '/lounge': typeof LoungeRoute
+  '/onboarding': typeof OnboardingRoute
   '/app/profile': typeof AppProfileRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/auth': typeof AuthIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/time-tracker/day': typeof AppTimeTrackerDayRoute
@@ -149,9 +165,11 @@ export interface FileRoutesById {
   '/app': typeof AppRouteWithChildren
   '/demo-payment': typeof DemoPaymentRoute
   '/lounge': typeof LoungeRoute
+  '/onboarding': typeof OnboardingRoute
   '/app/profile': typeof AppProfileRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/auth/': typeof AuthIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/app/time-tracker/day': typeof AppTimeTrackerDayRoute
@@ -169,9 +187,11 @@ export interface FileRouteTypes {
     | '/app'
     | '/demo-payment'
     | '/lounge'
+    | '/onboarding'
     | '/app/profile'
     | '/auth/forgot-password'
     | '/auth/reset-password'
+    | '/invite/$token'
     | '/auth/'
     | '/api/auth/$'
     | '/app/time-tracker/day'
@@ -187,9 +207,11 @@ export interface FileRouteTypes {
     | '/app'
     | '/demo-payment'
     | '/lounge'
+    | '/onboarding'
     | '/app/profile'
     | '/auth/forgot-password'
     | '/auth/reset-password'
+    | '/invite/$token'
     | '/auth'
     | '/api/auth/$'
     | '/app/time-tracker/day'
@@ -205,9 +227,11 @@ export interface FileRouteTypes {
     | '/app'
     | '/demo-payment'
     | '/lounge'
+    | '/onboarding'
     | '/app/profile'
     | '/auth/forgot-password'
     | '/auth/reset-password'
+    | '/invite/$token'
     | '/auth/'
     | '/api/auth/$'
     | '/app/time-tracker/day'
@@ -224,14 +248,23 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   DemoPaymentRoute: typeof DemoPaymentRoute
   LoungeRoute: typeof LoungeRoute
+  OnboardingRoute: typeof OnboardingRoute
   AuthForgotPasswordRoute: typeof AuthForgotPasswordRoute
   AuthResetPasswordRoute: typeof AuthResetPasswordRoute
+  InviteTokenRoute: typeof InviteTokenRoute
   AuthIndexRoute: typeof AuthIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/lounge': {
       id: '/lounge'
       path: '/lounge'
@@ -265,6 +298,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth/'
       preLoaderRoute: typeof AuthIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/reset-password': {
@@ -376,8 +416,10 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   DemoPaymentRoute: DemoPaymentRoute,
   LoungeRoute: LoungeRoute,
+  OnboardingRoute: OnboardingRoute,
   AuthForgotPasswordRoute: AuthForgotPasswordRoute,
   AuthResetPasswordRoute: AuthResetPasswordRoute,
+  InviteTokenRoute: InviteTokenRoute,
   AuthIndexRoute: AuthIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }

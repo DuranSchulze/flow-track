@@ -36,7 +36,7 @@ export const Route = createFileRoute('/app')({
         },
       }
     } catch {
-      throw redirect({ to: '/lounge' })
+      throw redirect({ to: '/onboarding' })
     }
   },
   staleTime: 5 * 60 * 1000,

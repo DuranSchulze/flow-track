@@ -1,5 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
+import {
+  createWorkspaceInviteFn,
+  listWorkspaceInvitesFn,
+  resendWorkspaceInviteFn,
+  revokeWorkspaceInviteFn,
+} from '#/lib/server/workspace-invites'
 import {
   BarChart2,
   ChevronLeft,
@@ -24,7 +31,6 @@ import {
   createDepartmentFn,
   createProjectFn,
   createTagFn,
-  createWorkspaceMemberFn,
   createWorkspaceRoleFn,
   deleteCohortFn,
   deleteDepartmentFn,
@@ -34,6 +40,7 @@ import {
   updateWorkspaceSettingsFn,
 } from '#/lib/server/tracker'
 import type { TrackerState } from '#/lib/time-tracker/types'
+import { ThemeSection } from '#/components/settings/ThemeSection'
 
 type MemberStat = {
   memberId: string
@@ -323,6 +330,9 @@ export function ProfileScreen({ state }: { state: TrackerState }) {
             </div>
           </section>
 
+          {/* ── Theme / appearance ── */}
+          <ThemeSection />
+
           {/* ── Edit profile inline form ── */}
           {editing && (
             <section className="rounded-2xl border border-primary/30 bg-primary/10 p-6 shadow-sm">
@@ -563,7 +573,7 @@ export function MembersScreen({
     event.preventDefault()
     setPending(true)
     try {
-      await createWorkspaceMemberFn({
+      await createWorkspaceInviteFn({
         data: {
           email,
           workspaceRoleId,
@@ -571,15 +581,15 @@ export function MembersScreen({
         },
       })
       await router.invalidate()
-      gooeyToast.success('Member added', {
-        description: `${email} has been invited to the workspace.`,
+      gooeyToast.success('Invitation sent', {
+        description: `${email} will receive an email with a link to join.`,
       })
       setEmail('')
       setWorkspaceRoleId(state.roles[0]?.id ?? '')
       setDepartmentId('')
       setShowForm(false)
     } catch (err) {
-      gooeyToast.error('Could not add member', {
+      gooeyToast.error('Could not send invitation', {
         description: err instanceof Error ? err.message : 'Please try again.',
       })
     } finally {
@@ -615,6 +625,8 @@ export function MembersScreen({
         </div>
       )}
 
+      {canManage && <PendingInvitesPanel />}
+
       <section className="rounded-lg border border-border bg-card shadow-sm">
         {/* ── Header ── */}
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border p-4">
@@ -638,7 +650,7 @@ export function MembersScreen({
               ) : (
                 <UserPlus className="h-4 w-4" />
               )}
-              {showForm ? 'Cancel' : 'Add member'}
+              {showForm ? 'Cancel' : 'Invite member'}
             </button>
           )}
         </div>
@@ -1921,5 +1933,111 @@ export function SettingsScreen({ state }: { state: TrackerState }) {
         )}
       </section>
     </Page>
+  )
+}
+
+// ─── Pending Invites Panel ────────────────────────────────────────────────────
+
+function PendingInvitesPanel() {
+  const router = useRouter()
+  const { data: invites = [], refetch } = useQuery({
+    queryKey: ['workspace-invites'],
+    queryFn: () => listWorkspaceInvitesFn(),
+    staleTime: 30 * 1000,
+  })
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  if (invites.length === 0) return null
+
+  async function handleResend(id: string) {
+    setBusyId(id)
+    try {
+      await resendWorkspaceInviteFn({ data: { inviteId: id } })
+      await refetch()
+      gooeyToast.success('Invitation resent')
+    } catch (err) {
+      gooeyToast.error('Could not resend', {
+        description: err instanceof Error ? err.message : 'Please try again.',
+      })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function handleRevoke(id: string) {
+    setBusyId(id)
+    try {
+      await revokeWorkspaceInviteFn({ data: { inviteId: id } })
+      await refetch()
+      await router.invalidate()
+      gooeyToast.success('Invitation revoked')
+    } catch (err) {
+      gooeyToast.error('Could not revoke', {
+        description: err instanceof Error ? err.message : 'Please try again.',
+      })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-border bg-card shadow-sm">
+      <div className="border-b border-border p-4">
+        <h2 className="m-0 text-lg font-bold text-foreground">
+          Pending invitations ({invites.length})
+        </h2>
+        <p className="m-0 mt-1 text-sm text-muted-foreground">
+          These people have been sent an invite link but have not joined yet.
+        </p>
+      </div>
+      <ul className="m-0 grid list-none gap-0 p-0">
+        {invites.map((inv) => {
+          const expires = new Date(inv.expiresAt)
+          const isExpired = expires < new Date()
+          return (
+            <li
+              key={inv.id}
+              className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3 last:border-b-0"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="m-0 truncate text-sm font-semibold text-foreground">
+                  {inv.email}
+                </p>
+                <p className="m-0 mt-0.5 text-xs text-muted-foreground">
+                  {inv.roleName ?? 'Member'}
+                  {inv.departmentName ? ` · ${inv.departmentName}` : ''}
+                  {' · '}
+                  {isExpired ? (
+                    <span className="font-semibold text-amber-600 dark:text-amber-400">
+                      Expired {expires.toLocaleDateString()}
+                    </span>
+                  ) : (
+                    <>Expires {expires.toLocaleDateString()}</>
+                  )}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleResend(inv.id)}
+                  disabled={busyId === inv.id}
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+                >
+                  Resend
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleRevoke(inv.id)}
+                  disabled={busyId === inv.id}
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+                >
+                  Revoke
+                </button>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
   )
 }

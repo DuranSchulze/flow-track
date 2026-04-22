@@ -2,6 +2,10 @@ import { PrismaClient } from '../src/generated/prisma/client.js'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { auth } from '../src/lib/auth.js'
 import { DEV_CREDENTIALS } from '../src/lib/dev-credentials.js'
+import {
+  DEFAULT_WORKSPACE_ROLES,
+  DEFAULT_WORKSPACE_TIMEZONE,
+} from '../src/lib/server/workspace-defaults.js'
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL!,
@@ -19,22 +23,15 @@ async function main() {
     create: {
       name: 'My Company',
       slug: 'my-company',
-      timezone: 'Asia/Manila',
+      timezone: DEFAULT_WORKSPACE_TIMEZONE,
     },
   })
   console.log(`  Workspace: ${workspace.name} (${workspace.id})`)
 
   // ─── Default roles ─────────────────────────────────────────────────────────
-  const roleDefinitions = [
-    { name: 'Owner',    permissionLevel: 'OWNER',    color: '#0f172a' },
-    { name: 'Admin',    permissionLevel: 'ADMIN',    color: '#7c3aed' },
-    { name: 'Manager',  permissionLevel: 'MANAGER',  color: '#2563eb' },
-    { name: 'Employee', permissionLevel: 'EMPLOYEE', color: '#14b8a6' },
-  ] as const
-
   const roles = new Map<string, string>() // permissionLevel → id
 
-  for (const def of roleDefinitions) {
+  for (const def of DEFAULT_WORKSPACE_ROLES) {
     const role = await prisma.workspaceRole.upsert({
       where: { workspaceId_name: { workspaceId: workspace.id, name: def.name } },
       update: { color: def.color, permissionLevel: def.permissionLevel },

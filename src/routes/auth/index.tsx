@@ -16,10 +16,23 @@ import { cn } from '#/lib/utils'
 import { getSessionFn } from '#/lib/server/session'
 import { getWorkspaceAccessFn } from '#/lib/server/workspace-access'
 
+type AuthSearch = { invite?: string; email?: string }
+
 export const Route = createFileRoute('/auth/')({
-  loader: async () => {
+  validateSearch: (search: Record<string, unknown>): AuthSearch => ({
+    invite: typeof search.invite === 'string' ? search.invite : undefined,
+    email: typeof search.email === 'string' ? search.email : undefined,
+  }),
+  loaderDeps: ({ search }) => ({ invite: search.invite }),
+  loader: async ({ deps }) => {
     const session = await getSessionFn()
     if (session?.user) {
+      if (deps.invite) {
+        throw redirect({
+          to: '/invite/$token',
+          params: { token: deps.invite },
+        })
+      }
       let hasWorkspaceAccess = false
       try {
         await getWorkspaceAccessFn()
@@ -50,11 +63,14 @@ export const Route = createFileRoute('/auth/')({
 
 function AuthPage() {
   const { signedIn, email, name } = Route.useLoaderData()
+  const search = Route.useSearch()
   const navigate = useNavigate()
   const router = useRouter()
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
+  const [mode, setMode] = useState<'signin' | 'signup'>(
+    search.invite ? 'signup' : 'signin',
+  )
   const [formName, setFormName] = useState('')
-  const [formEmail, setFormEmail] = useState('')
+  const [formEmail, setFormEmail] = useState(search.email ?? '')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -80,7 +96,14 @@ function AuthPage() {
         return
       }
 
-      await navigate({ to: '/lounge' })
+      if (search.invite) {
+        await navigate({
+          to: '/invite/$token',
+          params: { token: search.invite },
+        })
+      } else {
+        await navigate({ to: '/onboarding' })
+      }
     } catch {
       gooeyToast.error('Something went wrong', {
         description: 'Please try again.',
@@ -172,7 +195,7 @@ function AuthPage() {
                 name={name}
                 email={email}
                 onSignOut={handleSignOut}
-                onCheckAccess={() => void navigate({ to: '/lounge' })}
+                onCheckAccess={() => void navigate({ to: '/onboarding' })}
               />
             ) : (
               <SignInForm
