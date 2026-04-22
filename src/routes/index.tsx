@@ -19,17 +19,17 @@ export const Route = createFileRoute('/')({
 
 function HomePage() {
   return (
-    <main className="min-h-screen bg-white text-slate-950 dark:bg-slate-950 dark:text-slate-50">
+    <main className="min-h-screen bg-background text-foreground">
       {/* ── Sticky header ───────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/80 backdrop-blur-md dark:border-slate-800/70 dark:bg-slate-950/80">
+      <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <Link to="/" className="flex items-center gap-3 no-underline">
             <img
               src="/logo192.png"
               alt=""
-              className="h-9 w-9 rounded-lg border border-slate-200 dark:border-slate-800"
+              className="h-9 w-9 rounded-lg border border-border bg-card"
             />
-            <span className="text-sm font-bold text-slate-950 dark:text-slate-50">
+            <span className="text-sm font-bold text-foreground">
               Flow Track
             </span>
           </Link>
@@ -37,13 +37,13 @@ function HomePage() {
           <nav className="hidden items-center gap-6 md:flex">
             <a
               href="#features"
-              className="text-sm font-semibold text-slate-600 no-underline transition-colors hover:text-slate-950 dark:text-slate-400 dark:hover:text-slate-50"
+              className="text-sm font-semibold text-muted-foreground no-underline transition-colors hover:text-foreground"
             >
               Features
             </a>
             <a
               href="#how-it-works"
-              className="text-sm font-semibold text-slate-600 no-underline transition-colors hover:text-slate-950 dark:text-slate-400 dark:hover:text-slate-50"
+              className="text-sm font-semibold text-muted-foreground no-underline transition-colors hover:text-foreground"
             >
               How it works
             </a>
@@ -53,7 +53,7 @@ function HomePage() {
             <ThemeToggle />
             <Link
               to="/auth"
-              className="hidden rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 no-underline transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 sm:inline-flex"
+              className="hidden rounded-lg border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground no-underline transition-colors hover:bg-muted sm:inline-flex"
             >
               Sign in
             </Link>
@@ -79,7 +79,7 @@ function HomePage() {
         </div>
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(to_right,oklch(0.5_0.02_250/0.08)_1px,transparent_1px),linear-gradient(to_bottom,oklch(0.5_0.02_250/0.08)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_80%)]"
+          className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(to_right,color-mix(in_oklab,var(--border)_45%,transparent)_1px,transparent_1px),linear-gradient(to_bottom,color-mix(in_oklab,var(--border)_45%,transparent)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_80%)]"
         />
 
         <div className="mx-auto grid max-w-6xl gap-12 px-4 py-16 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:py-24">
@@ -88,14 +88,14 @@ function HomePage() {
               <Sparkles className="h-3 w-3" />
               Internal time tracking
             </span>
-            <h1 className="m-0 mt-5 max-w-3xl text-5xl font-black leading-[1.05] tracking-tight text-slate-950 dark:text-slate-50 sm:text-6xl">
+            <h1 className="m-0 mt-5 max-w-3xl text-5xl font-black leading-[1.05] tracking-tight text-foreground sm:text-6xl">
               Track every hour,
               <br />
               <span className="bg-gradient-to-r from-[var(--primary)] to-[var(--primary)]/60 bg-clip-text text-transparent">
                 across every team.
               </span>
             </h1>
-            <p className="m-0 mt-6 max-w-xl text-lg leading-8 text-slate-600 dark:text-slate-400">
+            <p className="m-0 mt-6 max-w-xl text-lg leading-8 text-muted-foreground">
               A private company workspace for live timers, manual entries,
               controlled catalogs, and clean reporting — built for teams who
               care about their time.
@@ -110,7 +110,7 @@ function HomePage() {
               </Link>
               <a
                 href="#how-it-works"
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-800 no-underline transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-5 py-3 text-sm font-bold text-foreground no-underline transition-colors hover:bg-muted"
               >
                 See how it works
               </a>
@@ -122,19 +122,16 @@ function HomePage() {
       </section>
 
       {/* ── Features ────────────────────────────────────────────────── */}
-      <section
-        id="features"
-        className="border-t border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50"
-      >
+      <section id="features" className="border-t border-border bg-muted/30">
         <div className="mx-auto max-w-6xl px-4 py-20">
           <div className="max-w-2xl">
             <p className="m-0 text-sm font-bold uppercase tracking-wider text-[var(--primary)]">
               Features
             </p>
-            <h2 className="m-0 mt-2 text-3xl font-black tracking-tight text-slate-950 dark:text-slate-50 sm:text-4xl">
+            <h2 className="m-0 mt-2 text-3xl font-black tracking-tight text-foreground sm:text-4xl">
               Everything your team needs to track work.
             </h2>
-            <p className="m-0 mt-3 text-base text-slate-600 dark:text-slate-400">
+            <p className="m-0 mt-3 text-base text-muted-foreground">
               From solo freelancers to full departments — the same simple timer
               powers your whole workspace.
             </p>
@@ -176,13 +173,13 @@ function HomePage() {
       </section>
 
       {/* ── How it works ────────────────────────────────────────────── */}
-      <section id="how-it-works" className="bg-white dark:bg-slate-950">
+      <section id="how-it-works" className="bg-background">
         <div className="mx-auto max-w-6xl px-4 py-20">
           <div className="max-w-2xl">
             <p className="m-0 text-sm font-bold uppercase tracking-wider text-[var(--primary)]">
               How it works
             </p>
-            <h2 className="m-0 mt-2 text-3xl font-black tracking-tight text-slate-950 dark:text-slate-50 sm:text-4xl">
+            <h2 className="m-0 mt-2 text-3xl font-black tracking-tight text-foreground sm:text-4xl">
               Three steps to get started.
             </h2>
           </div>
@@ -208,7 +205,7 @@ function HomePage() {
       </section>
 
       {/* ── CTA band ────────────────────────────────────────────────── */}
-      <section className="border-y border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50">
+      <section className="border-y border-border bg-muted/30">
         <div className="mx-auto max-w-6xl px-4 py-16">
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary)]/80 p-10 shadow-xl sm:p-14">
             <div className="relative z-10 flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
@@ -222,7 +219,7 @@ function HomePage() {
               </div>
               <Link
                 to="/app/time-tracker"
-                className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-white px-6 py-3 text-sm font-bold text-slate-950 no-underline shadow-lg transition-transform hover:scale-105"
+                className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-card px-6 py-3 text-sm font-bold text-card-foreground no-underline shadow-lg transition-transform hover:scale-105"
               >
                 Open app
                 <ArrowRight className="h-4 w-4" />
@@ -230,32 +227,32 @@ function HomePage() {
             </div>
             <div
               aria-hidden
-              className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10 blur-3xl"
+              className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-[var(--primary-foreground)]/10 blur-3xl"
             />
             <div
               aria-hidden
-              className="absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-white/10 blur-3xl"
+              className="absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-[var(--primary-foreground)]/10 blur-3xl"
             />
           </div>
         </div>
       </section>
 
       {/* ── Footer ──────────────────────────────────────────────────── */}
-      <footer className="bg-white dark:bg-slate-950">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-slate-500 dark:text-slate-400 sm:flex-row">
+      <footer className="bg-background">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-muted-foreground sm:flex-row">
           <p className="m-0">
             © {new Date().getFullYear()} Flow Track — internal workspace.
           </p>
           <div className="flex items-center gap-4">
             <Link
               to="/auth"
-              className="no-underline transition-colors hover:text-slate-900 dark:hover:text-slate-100"
+              className="no-underline transition-colors hover:text-foreground"
             >
               Sign in
             </Link>
             <Link
               to="/app/time-tracker"
-              className="no-underline transition-colors hover:text-slate-900 dark:hover:text-slate-100"
+              className="no-underline transition-colors hover:text-foreground"
             >
               Open app
             </Link>
@@ -276,16 +273,14 @@ function Feature({
   body: string
 }) {
   return (
-    <div className="group rounded-xl border border-slate-200 bg-white p-6 transition-all hover:-translate-y-1 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700">
+    <div className="group rounded-xl border border-border bg-card p-6 transition-all hover:-translate-y-1 hover:shadow-lg hover:border-border/80">
       <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--primary)]/10 text-[var(--primary)] transition-colors group-hover:bg-[var(--primary)]/20">
         <Icon className="h-5 w-5" />
       </div>
-      <h3 className="m-0 mt-4 text-base font-bold text-slate-950 dark:text-slate-50">
+      <h3 className="m-0 mt-4 text-base font-bold text-card-foreground">
         {title}
       </h3>
-      <p className="m-0 mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-        {body}
-      </p>
+      <p className="m-0 mt-2 text-sm leading-6 text-muted-foreground">{body}</p>
     </div>
   )
 }
@@ -304,12 +299,8 @@ function Step({
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--primary)] text-lg font-black text-[var(--primary-foreground)] shadow-lg shadow-[var(--primary)]/20">
         {num}
       </div>
-      <h3 className="m-0 mt-5 text-lg font-bold text-slate-950 dark:text-slate-50">
-        {title}
-      </h3>
-      <p className="m-0 mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-        {body}
-      </p>
+      <h3 className="m-0 mt-5 text-lg font-bold text-foreground">{title}</h3>
+      <p className="m-0 mt-2 text-sm leading-6 text-muted-foreground">{body}</p>
     </div>
   )
 }
@@ -321,8 +312,8 @@ function TimerPreview() {
         aria-hidden
         className="absolute -inset-4 rounded-3xl bg-gradient-to-br from-[var(--primary)]/30 to-transparent blur-2xl"
       />
-      <div className="relative rotate-1 rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl transition-transform hover:rotate-0 dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+      <div className="relative rotate-1 rounded-2xl border border-border bg-card p-6 shadow-2xl transition-transform hover:rotate-0">
+        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <span className="flex items-center gap-2">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--primary)] opacity-75" />
@@ -333,16 +324,16 @@ function TimerPreview() {
           <span>Today</span>
         </div>
 
-        <p className="m-0 mt-4 text-sm font-bold text-slate-950 dark:text-slate-50">
+        <p className="m-0 mt-4 text-sm font-bold text-card-foreground">
           Dashboard redesign
         </p>
-        <p className="m-0 text-xs text-slate-500 dark:text-slate-400">
+        <p className="m-0 text-xs text-muted-foreground">
           Flow Track · Frontend
         </p>
 
         <div className="mt-5 flex items-end justify-between">
           <div>
-            <p className="m-0 font-mono text-4xl font-black tabular-nums text-slate-950 dark:text-slate-50">
+            <p className="m-0 font-mono text-4xl font-black tabular-nums text-card-foreground">
               01:24:07
             </p>
             <div className="mt-3 flex flex-wrap gap-1.5">
@@ -360,8 +351,8 @@ function TimerPreview() {
           </button>
         </div>
 
-        <div className="mt-6 border-t border-slate-100 pt-4 dark:border-slate-800">
-          <p className="m-0 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <div className="mt-6 border-t border-border/60 pt-4">
+          <p className="m-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Recent
           </p>
           <ul className="m-0 mt-2 grid gap-1 p-0 text-sm">
@@ -380,7 +371,7 @@ function TimerPreview() {
 
 function TagPill({ label }: { label: string }) {
   return (
-    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
       #{label}
     </span>
   )
@@ -396,12 +387,12 @@ function RecentRow({
   duration: string
 }) {
   return (
-    <li className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-slate-700 dark:text-slate-300">
+    <li className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-foreground/90">
       <span className="flex items-center gap-2">
         <Icon className="h-3.5 w-3.5 text-[var(--primary)]" />
         {title}
       </span>
-      <span className="font-mono text-xs tabular-nums text-slate-500 dark:text-slate-400">
+      <span className="font-mono text-xs tabular-nums text-muted-foreground">
         {duration}
       </span>
     </li>

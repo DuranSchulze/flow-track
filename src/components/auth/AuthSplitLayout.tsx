@@ -5,7 +5,7 @@ import { DevLoginButton } from '#/components/auth/DevLoginButton'
 
 export function AuthSplitLayout({ children }: { children: React.ReactNode }) {
   return (
-    <main className="relative min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
+    <main className="relative min-h-screen bg-background text-foreground">
       <div className="absolute top-4 right-4 z-20">
         <ThemeToggle />
       </div>
@@ -69,8 +69,12 @@ export function AuthSplitLayout({ children }: { children: React.ReactNode }) {
               to="/"
               className="inline-flex items-center gap-3 no-underline lg:hidden"
             >
-              <img src="/logo192.png" alt="" className="h-9 w-9 rounded-lg" />
-              <span className="text-sm font-bold text-slate-950 dark:text-slate-50">
+              <img
+                src="/logo192.png"
+                alt=""
+                className="h-9 w-9 rounded-lg border border-border bg-card"
+              />
+              <span className="text-sm font-bold text-foreground">
                 Clockify Timer
               </span>
             </Link>

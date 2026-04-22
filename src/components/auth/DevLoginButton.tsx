@@ -92,13 +92,13 @@ function DevLoginButtonInner() {
       className="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3"
     >
       {open && (
-        <div className="w-[340px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/60">
+        <div className="w-[340px] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+          <div className="flex items-center justify-between border-b border-border bg-muted/50 px-4 py-3">
             <div>
               <p className="m-0 text-xs font-bold uppercase tracking-wider text-[var(--primary)]">
                 Dev logins
               </p>
-              <p className="m-0 text-xs text-slate-500 dark:text-slate-400">
+              <p className="m-0 text-xs text-muted-foreground">
                 Shown only in <code>dev</code>. Seeded via{' '}
                 <code>pnpm db:seed</code>.
               </p>
@@ -107,7 +107,7 @@ function DevLoginButtonInner() {
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Close dev logins"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 hover:bg-slate-200 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-100"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <X className="h-4 w-4" />
             </button>
@@ -118,10 +118,10 @@ function DevLoginButtonInner() {
               const isPending = pending === cred.email
               return (
                 <li key={cred.email} className="group">
-                  <div className="flex items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                  <div className="flex items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-muted/60">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="truncate text-sm font-bold text-slate-950 dark:text-slate-50">
+                        <span className="truncate text-sm font-bold text-foreground">
                           {cred.name}
                         </span>
                         <span
@@ -133,7 +133,7 @@ function DevLoginButtonInner() {
                           {cred.roleLabel}
                         </span>
                       </div>
-                      <p className="m-0 truncate text-xs text-slate-500 dark:text-slate-400">
+                      <p className="m-0 truncate text-xs text-muted-foreground">
                         {cred.email}
                       </p>
                     </div>
@@ -142,7 +142,7 @@ function DevLoginButtonInner() {
                       type="button"
                       onClick={() => void copy(cred.email)}
                       aria-label={`Copy ${cred.email}`}
-                      className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 opacity-0 transition hover:bg-slate-200 hover:text-slate-700 group-hover:opacity-100 dark:hover:bg-slate-700 dark:hover:text-slate-200"
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground opacity-0 transition hover:bg-muted hover:text-foreground group-hover:opacity-100"
                     >
                       <Copy className="h-3.5 w-3.5" />
                     </button>
@@ -168,17 +168,15 @@ function DevLoginButtonInner() {
             })}
           </ul>
 
-          <div className="flex items-center justify-between gap-2 border-t border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-400">
+          <div className="flex items-center justify-between gap-2 border-t border-border bg-muted/50 px-4 py-2 text-xs text-muted-foreground">
             <span>
               Password for all:{' '}
-              <code className="font-mono text-slate-700 dark:text-slate-200">
-                {DEV_PASSWORD}
-              </code>
+              <code className="font-mono text-foreground">{DEV_PASSWORD}</code>
             </span>
             <button
               type="button"
               onClick={() => void copy(DEV_PASSWORD)}
-              className="inline-flex items-center gap-1 rounded text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+              className="inline-flex items-center gap-1 rounded text-muted-foreground hover:text-foreground"
             >
               <Copy className="h-3 w-3" />
               Copy
@@ -192,7 +190,7 @@ function DevLoginButtonInner() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label="Dev logins"
-        className="flex h-12 items-center gap-2 rounded-full bg-slate-900 px-4 text-sm font-bold text-white shadow-xl transition-all hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+        className="flex h-12 items-center gap-2 rounded-full bg-primary px-4 text-sm font-bold text-primary-foreground shadow-xl transition-all hover:brightness-110"
       >
         <KeyRound className="h-4 w-4" />
         Dev logins

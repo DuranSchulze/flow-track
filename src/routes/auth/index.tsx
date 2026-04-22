@@ -120,7 +120,7 @@ function AuthPage() {
   }
 
   return (
-    <main className="relative min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
+    <main className="relative min-h-screen bg-background text-foreground">
       <div className="absolute top-4 right-4 z-20">
         <ThemeToggle />
       </div>
@@ -184,8 +184,12 @@ function AuthPage() {
               to="/"
               className="inline-flex items-center gap-3 no-underline lg:hidden"
             >
-              <img src="/logo192.png" alt="" className="h-9 w-9 rounded-lg" />
-              <span className="text-sm font-bold text-slate-950 dark:text-slate-50">
+              <img
+                src="/logo192.png"
+                alt=""
+                className="h-9 w-9 rounded-lg border border-border bg-card"
+              />
+              <span className="text-sm font-bold text-foreground">
                 Clockify Timer
               </span>
             </Link>
@@ -253,20 +257,16 @@ function SignedInPanel({
       <h1 className="m-0 text-2xl font-black tracking-tight">
         Already signed in
       </h1>
-      <p className="m-0 mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+      <p className="m-0 mt-2 text-sm leading-6 text-muted-foreground">
         You are currently logged in to this device.
       </p>
 
-      <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
-        <p className="m-0 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+      <div className="mt-5 rounded-lg border border-border bg-muted/40 p-4">
+        <p className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Logged in as
         </p>
-        <p className="m-0 mt-1 text-base font-bold text-slate-950 dark:text-slate-50">
-          {name}
-        </p>
-        <p className="m-0 text-sm text-slate-500 dark:text-slate-400">
-          {email}
-        </p>
+        <p className="m-0 mt-1 text-base font-bold text-foreground">{name}</p>
+        <p className="m-0 text-sm text-muted-foreground">{email}</p>
       </div>
 
       <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
@@ -278,14 +278,14 @@ function SignedInPanel({
         <button
           type="button"
           onClick={onCheckAccess}
-          className="h-11 rounded-lg bg-slate-950 text-sm font-bold text-white transition-colors hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+          className="h-11 rounded-lg bg-primary text-sm font-bold text-primary-foreground transition-all hover:brightness-110"
         >
           Check workspace access
         </button>
         <button
           type="button"
           onClick={onSignOut}
-          className="h-11 rounded-lg border border-slate-200 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          className="h-11 rounded-lg border border-border bg-card text-sm font-semibold text-foreground transition-colors hover:bg-muted"
         >
           Sign out and use another email
         </button>
@@ -324,7 +324,7 @@ function SignInForm({
       <h1 className="m-0 text-3xl font-black tracking-tight">
         {mode === 'signup' ? 'Create your account' : 'Welcome back'}
       </h1>
-      <p className="m-0 mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+      <p className="m-0 mt-2 text-sm leading-6 text-muted-foreground">
         {mode === 'signup'
           ? 'Sign up to access your workspace. Your Owner or Admin controls membership.'
           : 'Sign in to your workspace. Access is managed by your Owner or Admin.'}
@@ -334,7 +334,7 @@ function SignInForm({
       <div
         role="tablist"
         aria-label="Authentication mode"
-        className="mt-6 grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1 dark:border-slate-800 dark:bg-slate-800"
+        className="mt-6 grid grid-cols-2 gap-1 rounded-lg border border-border bg-muted/60 p-1"
       >
         <TabButton
           active={mode === 'signin'}
@@ -352,28 +352,28 @@ function SignInForm({
 
       <form onSubmit={onSubmit} className="mt-6 grid gap-4">
         {mode === 'signup' && (
-          <label className="grid gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+          <label className="grid gap-2 text-sm font-semibold text-foreground/90">
             Name
             <input
               value={name}
               onChange={(event) => onNameChange(event.target.value)}
-              className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition-colors focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+              className="h-11 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
               required
             />
           </label>
         )}
-        <label className="grid gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+        <label className="grid gap-2 text-sm font-semibold text-foreground/90">
           Email
           <input
             type="email"
             value={email}
             onChange={(event) => onEmailChange(event.target.value)}
             autoComplete="email"
-            className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition-colors focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+            className="h-11 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
             required
           />
         </label>
-        <div className="grid gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+        <div className="grid gap-2 text-sm font-semibold text-foreground/90">
           <div className="flex items-center justify-between">
             <label htmlFor="auth-password">Password</label>
             {mode === 'signin' && (
@@ -431,8 +431,8 @@ function TabButton({
       className={cn(
         'h-9 rounded-md text-sm font-semibold transition-colors',
         active
-          ? 'bg-white text-slate-950 shadow-sm dark:bg-slate-950 dark:text-slate-50'
-          : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100',
+          ? 'bg-card text-card-foreground shadow-sm'
+          : 'text-muted-foreground hover:text-foreground',
       )}
     >
       {children}

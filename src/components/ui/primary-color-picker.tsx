@@ -66,10 +66,10 @@ export function PrimaryColorPicker({ className }: { className?: string }) {
             onClick={() => select(color.id)}
             tabIndex={isActive ? 0 : -1}
             className={cn(
-              'relative h-9 w-9 rounded-full border-2 transition-all outline-none',
+              'relative h-9 w-9 rounded-full border-2 transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
               isActive
-                ? 'border-slate-950 scale-110 dark:border-white'
-                : 'border-transparent hover:scale-105 focus-visible:border-slate-400',
+                ? 'border-foreground scale-110'
+                : 'border-transparent hover:scale-105',
             )}
             style={{ backgroundColor: color.swatch }}
           >
