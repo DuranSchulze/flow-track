@@ -262,6 +262,47 @@ const setMemberStatusSchema = z.object({
   status: z.enum(['ACTIVE', 'DISABLED']),
 })
 
+const updateWorkspaceBillingSchema = z.object({
+  defaultBillableRate: z.number().finite().min(0),
+  billableCurrency: z.string().trim().min(3).max(8),
+})
+
+const updateMemberBillableRateSchema = z.object({
+  memberId: z.string().min(1),
+  billableRate: z.number().finite().min(0).nullable(),
+})
+
+const memberIdSchema = z.object({
+  memberId: z.string().min(1),
+})
+
+const employeeProfileSchema = z.object({
+  employeeNumber: z.string().trim().max(50).optional().or(z.literal('')),
+  positionTitle: z.string().trim().max(100).optional().or(z.literal('')),
+  employmentType: z
+    .enum(['FULL_TIME', 'PART_TIME', 'CONTRACTOR', 'INTERN', 'PROBATIONARY'])
+    .optional(),
+  employmentStatus: z
+    .enum(['ACTIVE', 'ON_LEAVE', 'RESIGNED', 'TERMINATED'])
+    .optional(),
+  hireDate: z.string().date().optional().or(z.literal('')),
+  regularizationDate: z.string().date().optional().or(z.literal('')),
+  separationDate: z.string().date().optional().or(z.literal('')),
+})
+
+const governmentIdsSchema = z.object({
+  sssNumber: z.string().trim().max(25).optional().or(z.literal('')),
+  philHealthNumber: z.string().trim().max(25).optional().or(z.literal('')),
+  tinNumber: z.string().trim().max(25).optional().or(z.literal('')),
+  pagIbigNumber: z.string().trim().max(25).optional().or(z.literal('')),
+})
+
+const updateMemberDetailSchema = z.object({
+  memberId: z.string().min(1),
+  employeeProfile: employeeProfileSchema.optional(),
+  governmentIds: governmentIdsSchema.optional(),
+})
+
 export const updateWorkspaceMemberFn = createServerFn({ method: 'POST' })
   .inputValidator((input) => updateWorkspaceMemberSchema.parse(input))
   .handler(async ({ data }) => {
@@ -276,14 +317,69 @@ export const setMemberStatusFn = createServerFn({ method: 'POST' })
     return setMemberStatus(data)
   })
 
+export const updateWorkspaceBillingFn = createServerFn({ method: 'POST' })
+  .inputValidator((input) => updateWorkspaceBillingSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { updateWorkspaceBilling } = await import('./tracker.server')
+    return updateWorkspaceBilling(data)
+  })
+
+export const updateMemberBillableRateFn = createServerFn({ method: 'POST' })
+  .inputValidator((input) => updateMemberBillableRateSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { updateMemberBillableRate } = await import('./tracker.server')
+    return updateMemberBillableRate(data)
+  })
+
+export const getMemberDetailFn = createServerFn({ method: 'GET' })
+  .inputValidator((input) => memberIdSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { getMemberDetail } = await import('./tracker.server')
+    return getMemberDetail(data)
+  })
+
+export const getCurrencyOptionsFn = createServerFn({ method: 'GET' }).handler(
+  async () => {
+    const { getCurrencyOptions } = await import('./tracker.server')
+    return getCurrencyOptions()
+  },
+)
+
+export const updateMemberDetailFn = createServerFn({ method: 'POST' })
+  .inputValidator((input) => updateMemberDetailSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { updateMemberDetail } = await import('./tracker.server')
+    return updateMemberDetail(data)
+  })
+
 // ─── Profile update ───────────────────────────────────────────────────────────
+
+const addressSchema = z.object({
+  buildingNo: z.string().trim().max(50).optional().or(z.literal('')),
+  street: z.string().trim().max(100).optional().or(z.literal('')),
+  city: z.string().trim().max(100).optional().or(z.literal('')),
+  province: z.string().trim().max(100).optional().or(z.literal('')),
+  postalCode: z.string().trim().max(20).optional().or(z.literal('')),
+  country: z.string().trim().max(100).default('Philippines'),
+})
 
 const updateProfileSchema = z.object({
   name: z.string().trim().min(1).max(150),
   firstName: z.string().trim().min(1).max(50),
+  middleName: z.string().trim().max(50).optional().or(z.literal('')),
   lastName: z.string().trim().min(1).max(50),
   contactNumber: z.string().trim().max(50).optional(),
+  birthDate: z.string().date().optional().or(z.literal('')),
+  gender: z
+    .enum(['MALE', 'FEMALE', 'NON_BINARY', 'PREFER_NOT_TO_SAY'])
+    .optional()
+    .or(z.literal('')),
+  maritalStatus: z
+    .enum(['SINGLE', 'MARRIED', 'SEPARATED', 'WIDOWED', 'DIVORCED'])
+    .optional()
+    .or(z.literal('')),
   avatarUrl: z.string().url().max(500).optional().or(z.literal('')),
+  address: addressSchema.optional(),
 })
 
 export const updateProfileFn = createServerFn({ method: 'POST' })
@@ -292,6 +388,13 @@ export const updateProfileFn = createServerFn({ method: 'POST' })
     const { updateProfile } = await import('./tracker.server')
     return updateProfile(data)
   })
+
+export const getSelfProfileFn = createServerFn({ method: 'GET' }).handler(
+  async () => {
+    const { getSelfProfile } = await import('./tracker.server')
+    return getSelfProfile()
+  },
+)
 
 // ─── Workspace settings ───────────────────────────────────────────────────────
 

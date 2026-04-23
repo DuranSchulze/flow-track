@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { gooeyToast } from 'goey-toast'
-import { useRouter } from '@tanstack/react-router'
+import { useNavigate, useRouter } from '@tanstack/react-router'
 import {
   ArrowDownUp,
   Check,
@@ -39,6 +39,7 @@ import type {
   TrackerState,
   ViewMode,
 } from '#/lib/time-tracker/types'
+import { Button } from '#/components/ui/button'
 
 type DraftEntry = {
   description: string
@@ -51,6 +52,12 @@ type DraftEntry = {
 }
 
 type SortKey = 'newest' | 'oldest' | 'longest' | 'shortest'
+
+const VIEW_OPTIONS = [
+  { value: 'day', label: 'Day' },
+  { value: 'week', label: 'Week' },
+  { value: 'month', label: 'Month' },
+] as const satisfies readonly { value: ViewMode; label: string }[]
 
 const emptyDraft = (projectId = '', tagId = ''): DraftEntry => {
   const start = new Date()
@@ -77,6 +84,7 @@ export function TimeTrackerDashboard({
   view?: ViewMode
 }) {
   const router = useRouter()
+  const navigate = useNavigate()
   const [tick, setTick] = useState(() => Date.now())
 
   // ── Input mode toggle ──
@@ -185,9 +193,7 @@ export function TimeTrackerDashboard({
         return new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime()
       if (sortKey === 'longest')
         return getEntrySeconds(b, tick) - getEntrySeconds(a, tick)
-      if (sortKey === 'shortest')
-        return getEntrySeconds(a, tick) - getEntrySeconds(b, tick)
-      return 0
+      return getEntrySeconds(a, tick) - getEntrySeconds(b, tick)
     })
 
     return result
@@ -346,6 +352,13 @@ export function TimeTrackerDashboard({
     }, `Tag "${name}" created`)
   }
 
+  function changeView(nextView: ViewMode) {
+    void navigate({
+      to: '/app/time-tracker',
+      search: { view: nextView },
+    })
+  }
+
   return (
     <div className="grid gap-6">
       {/* ── Header + metrics ── */}
@@ -362,13 +375,33 @@ export function TimeTrackerDashboard({
               {currentUser.name} · {currentUser.roleName}
             </p>
           </div>
-          <div className="rounded-lg border border-border bg-muted px-4 py-3 text-right">
-            <p className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {view} total
-            </p>
-            <p className="m-0 mt-1 text-2xl font-bold text-foreground">
-              {formatHours(totals.selectedTotal)}
-            </p>
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <div
+              className="inline-flex overflow-hidden rounded-md border border-border bg-background p-1"
+              role="group"
+              aria-label="Time tracker view"
+            >
+              {VIEW_OPTIONS.map((option) => (
+                <Button
+                  key={option.value}
+                  type="button"
+                  variant={view === option.value ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => changeView(option.value)}
+                  aria-pressed={view === option.value}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+            <div className="rounded-lg border border-border bg-muted px-4 py-3 text-right">
+              <p className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {view} total
+              </p>
+              <p className="m-0 mt-1 text-2xl font-bold text-foreground">
+                {formatHours(totals.selectedTotal)}
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -440,24 +473,26 @@ export function TimeTrackerDashboard({
                     disabled={!!activeEntry}
                     className="h-11 w-full rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary disabled:bg-muted disabled:text-muted-foreground"
                   />
-                  {showSuggestions && descriptionSuggestions.length > 0 && !activeEntry && (
-                    <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-border bg-card shadow-lg">
-                      {descriptionSuggestions.map((desc) => (
-                        <button
-                          key={desc}
-                          type="button"
-                          onMouseDown={(e) => {
-                            e.preventDefault()
-                            setTimerDescription(desc)
-                            setShowSuggestions(false)
-                          }}
-                          className="flex w-full items-center px-3 py-2.5 text-left text-sm text-foreground hover:bg-accent"
-                        >
-                          {desc}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  {showSuggestions &&
+                    descriptionSuggestions.length > 0 &&
+                    !activeEntry && (
+                      <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+                        {descriptionSuggestions.map((desc) => (
+                          <button
+                            key={desc}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault()
+                              setTimerDescription(desc)
+                              setShowSuggestions(false)
+                            }}
+                            className="flex w-full items-center px-3 py-2.5 text-left text-sm text-foreground hover:bg-accent"
+                          >
+                            {desc}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                 </div>
                 <ProjectPicker
                   projects={state.projects}

@@ -27,6 +27,7 @@ import { Route as AppTimeTrackerWeekRouteImport } from './routes/app/time-tracke
 import { Route as AppTimeTrackerMonthRouteImport } from './routes/app/time-tracker/month'
 import { Route as AppTimeTrackerDayRouteImport } from './routes/app/time-tracker/day'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as AppWorkspaceMembersMemberIdRouteImport } from './routes/app/workspace/members.$memberId'
 
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
@@ -118,6 +119,12 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppWorkspaceMembersMemberIdRoute =
+  AppWorkspaceMembersMemberIdRouteImport.update({
+    id: '/$memberId',
+    path: '/$memberId',
+    getParentRoute: () => AppWorkspaceMembersRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -135,9 +142,10 @@ export interface FileRoutesByFullPath {
   '/app/time-tracker/month': typeof AppTimeTrackerMonthRoute
   '/app/time-tracker/week': typeof AppTimeTrackerWeekRoute
   '/app/workspace/catalogs': typeof AppWorkspaceCatalogsRoute
-  '/app/workspace/members': typeof AppWorkspaceMembersRoute
+  '/app/workspace/members': typeof AppWorkspaceMembersRouteWithChildren
   '/app/workspace/settings': typeof AppWorkspaceSettingsRoute
   '/app/time-tracker/': typeof AppTimeTrackerIndexRoute
+  '/app/workspace/members/$memberId': typeof AppWorkspaceMembersMemberIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -155,9 +163,10 @@ export interface FileRoutesByTo {
   '/app/time-tracker/month': typeof AppTimeTrackerMonthRoute
   '/app/time-tracker/week': typeof AppTimeTrackerWeekRoute
   '/app/workspace/catalogs': typeof AppWorkspaceCatalogsRoute
-  '/app/workspace/members': typeof AppWorkspaceMembersRoute
+  '/app/workspace/members': typeof AppWorkspaceMembersRouteWithChildren
   '/app/workspace/settings': typeof AppWorkspaceSettingsRoute
   '/app/time-tracker': typeof AppTimeTrackerIndexRoute
+  '/app/workspace/members/$memberId': typeof AppWorkspaceMembersMemberIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -176,9 +185,10 @@ export interface FileRoutesById {
   '/app/time-tracker/month': typeof AppTimeTrackerMonthRoute
   '/app/time-tracker/week': typeof AppTimeTrackerWeekRoute
   '/app/workspace/catalogs': typeof AppWorkspaceCatalogsRoute
-  '/app/workspace/members': typeof AppWorkspaceMembersRoute
+  '/app/workspace/members': typeof AppWorkspaceMembersRouteWithChildren
   '/app/workspace/settings': typeof AppWorkspaceSettingsRoute
   '/app/time-tracker/': typeof AppTimeTrackerIndexRoute
+  '/app/workspace/members/$memberId': typeof AppWorkspaceMembersMemberIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -201,6 +211,7 @@ export interface FileRouteTypes {
     | '/app/workspace/members'
     | '/app/workspace/settings'
     | '/app/time-tracker/'
+    | '/app/workspace/members/$memberId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -221,6 +232,7 @@ export interface FileRouteTypes {
     | '/app/workspace/members'
     | '/app/workspace/settings'
     | '/app/time-tracker'
+    | '/app/workspace/members/$memberId'
   id:
     | '__root__'
     | '/'
@@ -241,6 +253,7 @@ export interface FileRouteTypes {
     | '/app/workspace/members'
     | '/app/workspace/settings'
     | '/app/time-tracker/'
+    | '/app/workspace/members/$memberId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -384,8 +397,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/workspace/members/$memberId': {
+      id: '/app/workspace/members/$memberId'
+      path: '/$memberId'
+      fullPath: '/app/workspace/members/$memberId'
+      preLoaderRoute: typeof AppWorkspaceMembersMemberIdRouteImport
+      parentRoute: typeof AppWorkspaceMembersRoute
+    }
   }
 }
+
+interface AppWorkspaceMembersRouteChildren {
+  AppWorkspaceMembersMemberIdRoute: typeof AppWorkspaceMembersMemberIdRoute
+}
+
+const AppWorkspaceMembersRouteChildren: AppWorkspaceMembersRouteChildren = {
+  AppWorkspaceMembersMemberIdRoute: AppWorkspaceMembersMemberIdRoute,
+}
+
+const AppWorkspaceMembersRouteWithChildren =
+  AppWorkspaceMembersRoute._addFileChildren(AppWorkspaceMembersRouteChildren)
 
 interface AppRouteChildren {
   AppProfileRoute: typeof AppProfileRoute
@@ -393,7 +424,7 @@ interface AppRouteChildren {
   AppTimeTrackerMonthRoute: typeof AppTimeTrackerMonthRoute
   AppTimeTrackerWeekRoute: typeof AppTimeTrackerWeekRoute
   AppWorkspaceCatalogsRoute: typeof AppWorkspaceCatalogsRoute
-  AppWorkspaceMembersRoute: typeof AppWorkspaceMembersRoute
+  AppWorkspaceMembersRoute: typeof AppWorkspaceMembersRouteWithChildren
   AppWorkspaceSettingsRoute: typeof AppWorkspaceSettingsRoute
   AppTimeTrackerIndexRoute: typeof AppTimeTrackerIndexRoute
 }
@@ -404,7 +435,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppTimeTrackerMonthRoute: AppTimeTrackerMonthRoute,
   AppTimeTrackerWeekRoute: AppTimeTrackerWeekRoute,
   AppWorkspaceCatalogsRoute: AppWorkspaceCatalogsRoute,
-  AppWorkspaceMembersRoute: AppWorkspaceMembersRoute,
+  AppWorkspaceMembersRoute: AppWorkspaceMembersRouteWithChildren,
   AppWorkspaceSettingsRoute: AppWorkspaceSettingsRoute,
   AppTimeTrackerIndexRoute: AppTimeTrackerIndexRoute,
 }

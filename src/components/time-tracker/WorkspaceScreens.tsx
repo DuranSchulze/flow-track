@@ -1,18 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
 import {
-  createWorkspaceInviteFn,
-  listWorkspaceInvitesFn,
-  resendWorkspaceInviteFn,
-  revokeWorkspaceInviteFn,
-} from '#/lib/server/workspace-invites'
-import {
-  BarChart2,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  DollarSign,
   KeyRound,
   Pencil,
   Plus,
@@ -21,7 +9,6 @@ import {
   UserPlus,
   X,
 } from 'lucide-react'
-import { formatHours } from '#/lib/time-tracker/store'
 import { gooeyToast } from 'goey-toast'
 import { authClient } from '#/lib/auth-client'
 import {
@@ -34,22 +21,55 @@ import {
   createWorkspaceRoleFn,
   deleteCohortFn,
   deleteDepartmentFn,
-  setMemberStatusFn,
   updateProfileFn,
-  updateWorkspaceMemberFn,
   updateWorkspaceSettingsFn,
 } from '#/lib/server/tracker'
 import type { TrackerState } from '#/lib/time-tracker/types'
 import { ThemeSection } from '#/components/settings/ThemeSection'
+import { InviteMemberForm } from './InviteMemberForm'
+import { MembersTable } from './MembersTable'
+import type { MemberStat } from './MembersTable'
+import { PendingInvitesPanel } from './PendingInvitesPanel'
+import { WorkspaceBillingPanel } from './WorkspaceBillingPanel'
+import {
+  getWorkspaceMembersSummary,
+  WorkspaceMembersSummary,
+} from './WorkspaceMembersSummary'
+import { Button } from '#/components/ui/button'
+import { Input } from '#/components/ui/input'
+import { Label } from '#/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '#/components/ui/select'
 
-type MemberStat = {
-  memberId: string
-  totalSeconds: number
-  billableSeconds: number
-  entryCount: number
-  thisWeekSeconds: number
-  thisMonthSeconds: number
-  topProjects: Array<{ projectId: string; seconds: number }>
+type SelfProfileData = {
+  user: {
+    id: string
+    name: string
+    email: string
+    image: string | null
+  }
+  profile: {
+    firstName: string
+    middleName: string
+    lastName: string
+    contactNumber: string
+    birthDate: string
+    gender: string
+    maritalStatus: string
+  } | null
+  address: {
+    buildingNo: string
+    street: string
+    city: string
+    province: string
+    postalCode: string
+    country: string
+  } | null
 }
 
 const PAGE_SIZE = 10
@@ -66,7 +86,7 @@ function Page({
   children: React.ReactNode
 }) {
   return (
-    <div className="grid gap-6">
+    <div className="grid min-w-0 gap-6">
       <div>
         <p className="m-0 text-sm font-semibold text-primary">{eyebrow}</p>
         <h1 className="m-0 mt-1 text-2xl font-bold tracking-tight text-foreground">
@@ -156,21 +176,52 @@ function MemberStatusBadge({ status }: { status: string }) {
 
 // ─── ProfileScreen ────────────────────────────────────────────────────────────
 
-export function ProfileScreen({ state }: { state: TrackerState }) {
+export function ProfileScreen({
+  state,
+  selfProfile,
+}: {
+  state: TrackerState
+  selfProfile: SelfProfileData
+}) {
   const router = useRouter()
   const member = state.members.find((m) => m.id === state.currentMemberId)!
   const department = state.departments.find((d) => d.id === member.departmentId)
   const cohorts = state.cohorts.filter((c) => member.cohortIds.includes(c.id))
   const roleColor =
     state.roles.find((r) => r.id === member.workspaceRoleId)?.color ?? '#94a3b8'
-
-  // ── Edit profile state ──
-  const [editing, setEditing] = useState(false)
-  const [name, setName] = useState(member.name)
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [contactNumber, setContactNumber] = useState('')
-  const [avatarUrl, setAvatarUrl] = useState(member.image ?? '')
+  const [name, setName] = useState(selfProfile.user.name)
+  const [firstName, setFirstName] = useState(
+    selfProfile.profile?.firstName || member.name.split(' ')[0] || member.email,
+  )
+  const [middleName, setMiddleName] = useState(
+    selfProfile.profile?.middleName ?? '',
+  )
+  const [lastName, setLastName] = useState(
+    selfProfile.profile?.lastName ||
+      member.name.split(' ').slice(1).join(' ') ||
+      member.name,
+  )
+  const [contactNumber, setContactNumber] = useState(
+    selfProfile.profile?.contactNumber ?? '',
+  )
+  const [birthDate, setBirthDate] = useState(
+    selfProfile.profile?.birthDate ?? '',
+  )
+  const [gender, setGender] = useState(selfProfile.profile?.gender ?? '')
+  const [maritalStatus, setMaritalStatus] = useState(
+    selfProfile.profile?.maritalStatus ?? '',
+  )
+  const [avatarUrl, setAvatarUrl] = useState(selfProfile.user.image ?? '')
+  const [address, setAddress] = useState(
+    selfProfile.address ?? {
+      buildingNo: '',
+      street: '',
+      city: '',
+      province: '',
+      postalCode: '',
+      country: 'Philippines',
+    },
+  )
   const [savePending, setSavePending] = useState(false)
 
   async function handleSave(event: React.FormEvent) {
@@ -181,14 +232,18 @@ export function ProfileScreen({ state }: { state: TrackerState }) {
         data: {
           name,
           firstName,
+          middleName,
           lastName,
           contactNumber: contactNumber || undefined,
+          birthDate,
+          gender,
+          maritalStatus,
           avatarUrl,
+          address,
         },
       })
       await router.invalidate()
       gooeyToast.success('Profile updated')
-      setEditing(false)
     } catch (err) {
       gooeyToast.error('Could not update profile', {
         description: err instanceof Error ? err.message : 'Please try again.',
@@ -255,38 +310,30 @@ export function ProfileScreen({ state }: { state: TrackerState }) {
 
   return (
     <Page title="My Profile" eyebrow="Account">
-      <div className="flex justify-center">
-        <div className="w-full max-w-lg space-y-4">
-          {/* ── Avatar + identity card ── */}
-          <section className="rounded-2xl border border-border bg-card p-8 shadow-sm text-center">
-            {/* Avatar */}
-            <div className="flex justify-center mb-4">
-              {member.image ? (
+      <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+        <div className="grid h-fit gap-4">
+          <section className="rounded-lg border border-border bg-card p-6 text-center shadow-sm">
+            <div className="mb-4 flex justify-center">
+              {avatarUrl ? (
                 <img
-                  src={member.image}
-                  alt={member.name}
+                  src={avatarUrl}
+                  alt={name}
                   className="h-24 w-24 rounded-full object-cover ring-4 ring-muted"
                 />
               ) : (
                 <div
-                  className="h-24 w-24 rounded-full flex items-center justify-center text-2xl font-bold text-primary-foreground ring-4 ring-muted"
+                  className="flex h-24 w-24 items-center justify-center rounded-full text-2xl font-bold text-primary-foreground ring-4 ring-muted"
                   style={{ backgroundColor: roleColor }}
                 >
                   {initials}
                 </div>
               )}
             </div>
-
-            {/* Name + email */}
-            <h2 className="m-0 text-2xl font-bold text-foreground">
-              {member.name}
-            </h2>
+            <h2 className="m-0 text-2xl font-bold text-foreground">{name}</h2>
             <p className="m-0 mt-1 text-sm text-muted-foreground">
               {member.email}
             </p>
-
-            {/* Role + status badges */}
-            <div className="mt-3 flex items-center justify-center gap-2 flex-wrap">
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
               <span
                 className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold text-primary-foreground"
                 style={{ backgroundColor: roleColor }}
@@ -295,11 +342,7 @@ export function ProfileScreen({ state }: { state: TrackerState }) {
               </span>
               <MemberStatusBadge status={member.status} />
             </div>
-          </section>
-
-          {/* ── Info card ── */}
-          <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-            <dl className="grid grid-cols-2 gap-4">
+            <dl className="mt-5 grid gap-4 text-left">
               <Info
                 label="Department"
                 value={department?.name || 'Unassigned'}
@@ -309,105 +352,139 @@ export function ProfileScreen({ state }: { state: TrackerState }) {
                 value={cohorts.map((c) => c.name).join(', ') || 'None'}
               />
             </dl>
-
-            <div className="mt-5 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent transition-colors"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                Edit profile
-              </button>
-              <button
-                type="button"
-                onClick={() => setPwDialog(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent transition-colors"
-              >
-                <KeyRound className="h-3.5 w-3.5" />
-                Change password
-              </button>
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPwDialog(true)}
+              className="mt-5 w-full"
+            >
+              <KeyRound className="h-3.5 w-3.5" />
+              Change password
+            </Button>
           </section>
-
-          {/* ── Theme / appearance ── */}
           <ThemeSection />
-
-          {/* ── Edit profile inline form ── */}
-          {editing && (
-            <section className="rounded-2xl border border-primary/30 bg-primary/10 p-6 shadow-sm">
-              <h3 className="m-0 mb-4 text-base font-bold text-foreground">
-                Edit profile
-              </h3>
-              <form onSubmit={handleSave} className="grid gap-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="grid gap-1.5 text-xs font-semibold text-foreground">
-                    Display name
-                    <input
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required
-                      className="h-9 rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary"
-                    />
-                  </label>
-                  <label className="grid gap-1.5 text-xs font-semibold text-foreground">
-                    Contact number
-                    <input
-                      value={contactNumber}
-                      onChange={(e) => setContactNumber(e.target.value)}
-                      placeholder="Optional"
-                      className="h-9 rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary"
-                    />
-                  </label>
-                  <label className="grid gap-1.5 text-xs font-semibold text-foreground">
-                    First name
-                    <input
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      required
-                      className="h-9 rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary"
-                    />
-                  </label>
-                  <label className="grid gap-1.5 text-xs font-semibold text-foreground">
-                    Last name
-                    <input
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      required
-                      className="h-9 rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary"
-                    />
-                  </label>
-                  <label className="grid gap-1.5 text-xs font-semibold text-foreground sm:col-span-2">
-                    Profile picture URL
-                    <input
-                      value={avatarUrl}
-                      onChange={(e) => setAvatarUrl(e.target.value)}
-                      placeholder="https://example.com/photo.jpg (optional)"
-                      type="url"
-                      className="h-9 rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary"
-                    />
-                  </label>
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <button
-                    type="submit"
-                    disabled={savePending}
-                    className="h-9 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:brightness-110 disabled:bg-muted disabled:text-muted-foreground"
-                  >
-                    {savePending ? 'Saving…' : 'Save changes'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditing(false)}
-                    className="h-9 rounded-lg border border-border px-4 text-sm font-semibold text-foreground hover:bg-accent"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            </section>
-          )}
         </div>
+
+        <form onSubmit={handleSave} className="grid gap-4">
+          <SectionCard title="Account">
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <Label className="grid gap-2">
+                Display name
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </Label>
+              <Label className="grid gap-2">
+                Profile picture URL
+                <Input
+                  value={avatarUrl}
+                  onChange={(e) => setAvatarUrl(e.target.value)}
+                  type="url"
+                  placeholder="https://example.com/photo.jpg"
+                />
+              </Label>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Personal">
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Label className="grid gap-2">
+                First name
+                <Input
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                />
+              </Label>
+              <Label className="grid gap-2">
+                Middle name
+                <Input
+                  value={middleName}
+                  onChange={(e) => setMiddleName(e.target.value)}
+                />
+              </Label>
+              <Label className="grid gap-2">
+                Last name
+                <Input
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                />
+              </Label>
+              <Label className="grid gap-2">
+                Contact number
+                <Input
+                  value={contactNumber}
+                  onChange={(e) => setContactNumber(e.target.value)}
+                />
+              </Label>
+              <Label className="grid gap-2">
+                Birth date
+                <Input
+                  type="date"
+                  value={birthDate}
+                  onChange={(e) => setBirthDate(e.target.value)}
+                />
+              </Label>
+              <ProfileSelect
+                label="Gender"
+                value={gender}
+                onChange={setGender}
+                placeholder="Not set"
+                options={['MALE', 'FEMALE', 'NON_BINARY', 'PREFER_NOT_TO_SAY']}
+              />
+              <ProfileSelect
+                label="Marital status"
+                value={maritalStatus}
+                onChange={setMaritalStatus}
+                placeholder="Not set"
+                options={[
+                  'SINGLE',
+                  'MARRIED',
+                  'SEPARATED',
+                  'WIDOWED',
+                  'DIVORCED',
+                ]}
+              />
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Address">
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {(
+                [
+                  ['buildingNo', 'Building no.'],
+                  ['street', 'Street'],
+                  ['city', 'City'],
+                  ['province', 'Province'],
+                  ['postalCode', 'Postal code'],
+                  ['country', 'Country'],
+                ] as const
+              ).map(([key, label]) => (
+                <Label key={key} className="grid gap-2">
+                  {label}
+                  <Input
+                    value={address[key]}
+                    onChange={(e) =>
+                      setAddress((current) => ({
+                        ...current,
+                        [key]: e.target.value,
+                      }))
+                    }
+                  />
+                </Label>
+              ))}
+            </div>
+          </SectionCard>
+
+          <div className="flex justify-end">
+            <Button type="submit" disabled={savePending}>
+              {savePending ? 'Saving…' : 'Save profile'}
+            </Button>
+          </div>
+        </form>
       </div>
 
       {/* ── Change password dialog ── */}
@@ -485,6 +562,42 @@ export function ProfileScreen({ state }: { state: TrackerState }) {
   )
 }
 
+function ProfileSelect({
+  label,
+  value,
+  onChange,
+  placeholder,
+  options,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+  options: string[]
+}) {
+  return (
+    <Label className="grid gap-2">
+      {label}
+      <Select
+        value={value || 'NONE'}
+        onValueChange={(next) => onChange(next === 'NONE' ? '' : next)}
+      >
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="NONE">{placeholder}</SelectItem>
+          {options.map((option) => (
+            <SelectItem key={option} value={option}>
+              {option.replaceAll('_', ' ')}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Label>
+  )
+}
+
 // ─── MembersScreen ────────────────────────────────────────────────────────────
 
 export function MembersScreen({
@@ -494,7 +607,6 @@ export function MembersScreen({
   state: TrackerState
   memberStats?: MemberStat[]
 }) {
-  const router = useRouter()
   const currentMember = state.members.find(
     (m) => m.id === state.currentMemberId,
   )!
@@ -502,16 +614,7 @@ export function MembersScreen({
     currentMember.permissionLevel === 'OWNER' ||
     currentMember.permissionLevel === 'ADMIN'
 
-  // ── Add member form ──
   const [showForm, setShowForm] = useState(false)
-  const [email, setEmail] = useState('')
-  const [workspaceRoleId, setWorkspaceRoleId] = useState(
-    state.roles[0]?.id ?? '',
-  )
-  const [departmentId, setDepartmentId] = useState('')
-  const [pending, setPending] = useState(false)
-
-  // ── Search / filter / pagination ──
   const [search, setSearch] = useState('')
   const [filterRole, setFilterRole] = useState('')
   const [filterDept, setFilterDept] = useState('')
@@ -525,18 +628,8 @@ export function MembersScreen({
     return map
   }, [memberStats])
 
-  // ── Workspace-wide summary (owner view) ──
   const workspaceSummary = useMemo(() => {
-    if (!canManage || memberStats.length === 0) return null
-    return memberStats.reduce(
-      (acc, s) => ({
-        thisWeekSeconds: acc.thisWeekSeconds + s.thisWeekSeconds,
-        totalSeconds: acc.totalSeconds + s.totalSeconds,
-        billableSeconds: acc.billableSeconds + s.billableSeconds,
-        entryCount: acc.entryCount + s.entryCount,
-      }),
-      { thisWeekSeconds: 0, totalSeconds: 0, billableSeconds: 0, entryCount: 0 },
-    )
+    return canManage ? getWorkspaceMembersSummary(memberStats) : null
   }, [memberStats, canManage])
 
   // ── Filtered members ──
@@ -569,65 +662,17 @@ export function MembersScreen({
 
   const hasActiveFilters = search || filterRole || filterDept || filterStatus
 
-  async function handleAddMember(event: React.FormEvent) {
-    event.preventDefault()
-    setPending(true)
-    try {
-      await createWorkspaceInviteFn({
-        data: {
-          email,
-          workspaceRoleId,
-          departmentId: departmentId || undefined,
-        },
-      })
-      await router.invalidate()
-      gooeyToast.success('Invitation sent', {
-        description: `${email} will receive an email with a link to join.`,
-      })
-      setEmail('')
-      setWorkspaceRoleId(state.roles[0]?.id ?? '')
-      setDepartmentId('')
-      setShowForm(false)
-    } catch (err) {
-      gooeyToast.error('Could not send invitation', {
-        description: err instanceof Error ? err.message : 'Please try again.',
-      })
-    } finally {
-      setPending(false)
-    }
-  }
-
   return (
     <Page title="Workspace members" eyebrow="Owner/Admin">
-      {/* ── Analytics summary (owner/admin only) ── */}
       {canManage && workspaceSummary && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <AnalyticCard
-            icon={<Clock className="h-4 w-4" />}
-            label="This week"
-            value={formatHours(workspaceSummary.thisWeekSeconds)}
-          />
-          <AnalyticCard
-            icon={<BarChart2 className="h-4 w-4" />}
-            label="Total tracked"
-            value={formatHours(workspaceSummary.totalSeconds)}
-          />
-          <AnalyticCard
-            icon={<DollarSign className="h-4 w-4" />}
-            label="Billable"
-            value={formatHours(workspaceSummary.billableSeconds)}
-          />
-          <AnalyticCard
-            icon={<UserPlus className="h-4 w-4" />}
-            label="Total entries"
-            value={String(workspaceSummary.entryCount)}
-          />
-        </div>
+        <WorkspaceMembersSummary summary={workspaceSummary} />
       )}
+
+      {canManage && <WorkspaceBillingPanel workspace={state.workspace} />}
 
       {canManage && <PendingInvitesPanel />}
 
-      <section className="rounded-lg border border-border bg-card shadow-sm">
+      <section className="min-w-0 overflow-hidden rounded-lg border border-border bg-card shadow-sm">
         {/* ── Header ── */}
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border p-4">
           <div>
@@ -657,61 +702,11 @@ export function MembersScreen({
 
         {/* ── Add member form ── */}
         {showForm && (
-          <form
-            onSubmit={handleAddMember}
-            className="grid gap-4 border-b border-border bg-muted p-4 sm:grid-cols-[1fr_160px_200px_auto]"
-          >
-            <label className="grid gap-1.5 text-xs font-semibold text-foreground">
-              Email
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="employee@company.com"
-                required
-                className="h-10 rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary"
-              />
-            </label>
-            <label className="grid gap-1.5 text-xs font-semibold text-foreground">
-              Role
-              <select
-                value={workspaceRoleId}
-                onChange={(e) => setWorkspaceRoleId(e.target.value)}
-                required
-                className="h-10 rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary"
-              >
-                {state.roles.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="grid gap-1.5 text-xs font-semibold text-foreground">
-              Department
-              <select
-                value={departmentId}
-                onChange={(e) => setDepartmentId(e.target.value)}
-                className="h-10 rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary"
-              >
-                <option value="">Unassigned</option>
-                {state.departments.map((dept) => (
-                  <option key={dept.id} value={dept.id}>
-                    {dept.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="flex items-end">
-              <button
-                type="submit"
-                disabled={pending}
-                className="h-10 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:brightness-110 disabled:bg-muted disabled:text-muted-foreground"
-              >
-                {pending ? 'Adding…' : 'Add'}
-              </button>
-            </div>
-          </form>
+          <InviteMemberForm
+            roles={state.roles}
+            departments={state.departments}
+            onInvited={() => setShowForm(false)}
+          />
         )}
 
         {/* ── Search & filter bar ── */}
@@ -722,33 +717,49 @@ export function MembersScreen({
               type="search"
               placeholder="Search by name or email…"
               value={search}
-              onChange={(e) => { setSearch(e.target.value); resetPage() }}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                resetPage()
+              }}
               className="h-9 w-full rounded-lg border border-border bg-card pl-8 pr-3 text-sm text-foreground outline-none focus:border-primary"
             />
           </div>
           <select
             value={filterRole}
-            onChange={(e) => { setFilterRole(e.target.value); resetPage() }}
+            onChange={(e) => {
+              setFilterRole(e.target.value)
+              resetPage()
+            }}
             className="h-9 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-primary"
           >
             <option value="">All roles</option>
             {state.roles.map((r) => (
-              <option key={r.id} value={r.id}>{r.name}</option>
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
             ))}
           </select>
           <select
             value={filterDept}
-            onChange={(e) => { setFilterDept(e.target.value); resetPage() }}
+            onChange={(e) => {
+              setFilterDept(e.target.value)
+              resetPage()
+            }}
             className="h-9 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-primary"
           >
             <option value="">All departments</option>
             {state.departments.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
             ))}
           </select>
           <select
             value={filterStatus}
-            onChange={(e) => { setFilterStatus(e.target.value); resetPage() }}
+            onChange={(e) => {
+              setFilterStatus(e.target.value)
+              resetPage()
+            }}
             className="h-9 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-primary"
           >
             <option value="">All statuses</option>
@@ -773,420 +784,19 @@ export function MembersScreen({
           )}
         </div>
 
-        {/* ── Members table ── */}
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] border-collapse text-left text-sm">
-            <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3">Member</th>
-                <th className="px-4 py-3">Role</th>
-                <th className="px-4 py-3">Department</th>
-                <th className="px-4 py-3">Groups / cohorts</th>
-                <th className="px-4 py-3">Status</th>
-                {canManage && (
-                  <>
-                    <th className="px-4 py-3 text-right">This week</th>
-                    <th className="px-4 py-3 text-right">Total</th>
-                    <th className="px-4 py-3 text-right">Billable</th>
-                    <th className="px-4 py-3" />
-                  </>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {pagedMembers.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={canManage ? 9 : 5}
-                    className="px-4 py-8 text-center text-sm text-muted-foreground"
-                  >
-                    No members match your search.
-                  </td>
-                </tr>
-              ) : (
-                pagedMembers.map((member) => (
-                  <MemberRow
-                    key={member.id}
-                    member={member}
-                    state={state}
-                    canManage={canManage}
-                    isSelf={member.id === state.currentMemberId}
-                    stats={statsMap.get(member.id)}
-                  />
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* ── Pagination ── */}
-        {filteredMembers.length > PAGE_SIZE && (
-          <div className="flex items-center justify-between border-t border-border px-4 py-3">
-            <span className="text-sm text-muted-foreground">
-              Showing {page * PAGE_SIZE + 1}–
-              {Math.min((page + 1) * PAGE_SIZE, filteredMembers.length)} of{' '}
-              {filteredMembers.length} members
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setPage((p) => p - 1)}
-                disabled={page === 0}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span className="min-w-[60px] text-center text-sm text-foreground">
-                {page + 1} / {totalPages}
-              </span>
-              <button
-                type="button"
-                onClick={() => setPage((p) => p + 1)}
-                disabled={page >= totalPages - 1}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        )}
+        <MembersTable
+          members={pagedMembers}
+          state={state}
+          canManage={canManage}
+          statsMap={statsMap}
+          page={page}
+          pageSize={PAGE_SIZE}
+          totalCount={filteredMembers.length}
+          totalPages={totalPages}
+          onPageChange={setPage}
+        />
       </section>
     </Page>
-  )
-}
-
-function AnalyticCard({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: string
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-card p-4">
-      <div className="mb-2 flex items-center gap-2 text-muted-foreground">
-        {icon}
-        <span className="text-xs font-semibold uppercase tracking-wide">
-          {label}
-        </span>
-      </div>
-      <p className="m-0 text-2xl font-bold text-foreground">{value}</p>
-    </div>
-  )
-}
-
-function MemberRow({
-  member,
-  state,
-  canManage,
-  isSelf,
-  stats,
-}: {
-  member: TrackerState['members'][number]
-  state: TrackerState
-  canManage: boolean
-  isSelf: boolean
-  stats?: MemberStat
-}) {
-  const router = useRouter()
-  const department = state.departments.find((d) => d.id === member.departmentId)
-  const cohorts = state.cohorts.filter((c) => member.cohortIds.includes(c.id))
-
-  const [editing, setEditing] = useState(false)
-  const [showAnalytics, setShowAnalytics] = useState(false)
-  const [roleId, setRoleId] = useState(member.workspaceRoleId)
-  const [deptId, setDeptId] = useState(member.departmentId)
-  const [cohortIds, setCohortIds] = useState<string[]>(member.cohortIds)
-  const [pending, setPending] = useState(false)
-
-  async function handleSave() {
-    setPending(true)
-    try {
-      await updateWorkspaceMemberFn({
-        data: {
-          memberId: member.id,
-          workspaceRoleId: roleId || undefined,
-          departmentId: deptId || undefined,
-          cohortIds,
-        },
-      })
-      await router.invalidate()
-      gooeyToast.success('Member updated')
-      setEditing(false)
-    } catch (err) {
-      gooeyToast.error('Could not update member', {
-        description: err instanceof Error ? err.message : 'Please try again.',
-      })
-    } finally {
-      setPending(false)
-    }
-  }
-
-  async function handleToggleStatus() {
-    const next = member.status === 'DISABLED' ? 'ACTIVE' : 'DISABLED'
-    setPending(true)
-    try {
-      await setMemberStatusFn({ data: { memberId: member.id, status: next } })
-      await router.invalidate()
-      gooeyToast.success(
-        `Member ${next === 'DISABLED' ? 'disabled' : 'reactivated'}`,
-      )
-    } catch (err) {
-      gooeyToast.error('Could not update status', {
-        description: err instanceof Error ? err.message : 'Please try again.',
-      })
-    } finally {
-      setPending(false)
-    }
-  }
-
-  function toggleCohort(id: string) {
-    setCohortIds((prev) =>
-      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id],
-    )
-  }
-
-  if (editing && canManage) {
-    return (
-      <tr className="border-t border-border bg-muted">
-        <td className="px-4 py-3">
-          <p className="m-0 font-semibold text-foreground">{member.name}</p>
-          <p className="m-0 mt-0.5 text-xs text-muted-foreground">
-            {member.email}
-          </p>
-        </td>
-        <td className="px-4 py-3">
-          <select
-            value={roleId}
-            onChange={(e) => setRoleId(e.target.value)}
-            className="h-8 rounded border border-border bg-card text-foreground px-2 text-xs outline-none focus:border-primary"
-          >
-            <option value="">No role</option>
-            {state.roles.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </td>
-        <td className="px-4 py-3">
-          <select
-            value={deptId}
-            onChange={(e) => setDeptId(e.target.value)}
-            className="h-8 rounded border border-border bg-card text-foreground px-2 text-xs outline-none focus:border-primary"
-          >
-            <option value="">Unassigned</option>
-            {state.departments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-        </td>
-        <td className="px-4 py-3">
-          <div className="flex flex-wrap gap-1">
-            {state.cohorts.map((c) => (
-              <label
-                key={c.id}
-                className="flex cursor-pointer items-center gap-1 text-xs text-foreground"
-              >
-                <input
-                  type="checkbox"
-                  checked={cohortIds.includes(c.id)}
-                  onChange={() => toggleCohort(c.id)}
-                  className="rounded"
-                />
-                {c.name}
-              </label>
-            ))}
-          </div>
-        </td>
-        <td className="px-4 py-3">
-          <MemberStatusBadge status={member.status} />
-        </td>
-        <td className="px-4 py-3 text-right text-sm text-muted-foreground">
-          {formatHours(stats?.thisWeekSeconds ?? 0)}
-        </td>
-        <td className="px-4 py-3 text-right text-sm text-muted-foreground">
-          {formatHours(stats?.totalSeconds ?? 0)}
-        </td>
-        <td className="px-4 py-3 text-right text-sm text-muted-foreground">
-          {formatHours(stats?.billableSeconds ?? 0)}
-        </td>
-        <td className="px-4 py-3">
-          <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={pending}
-              className="h-7 rounded bg-primary px-3 text-xs font-bold text-primary-foreground hover:brightness-110 disabled:bg-muted disabled:text-muted-foreground"
-            >
-              {pending ? '…' : 'Save'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditing(false)}
-              className="h-7 rounded border border-border px-2 text-xs text-muted-foreground hover:bg-accent"
-            >
-              Cancel
-            </button>
-          </div>
-        </td>
-      </tr>
-    )
-  }
-
-  return (
-    <>
-      <tr className="border-t border-border">
-        <td className="px-4 py-3">
-          <p className="m-0 font-semibold text-foreground">{member.name}</p>
-          <p className="m-0 mt-1 text-xs text-muted-foreground">{member.email}</p>
-        </td>
-        <td className="px-4 py-3">
-          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
-            <span
-              className="inline-block h-2.5 w-2.5 rounded-full"
-              style={{
-                backgroundColor:
-                  state.roles.find((r) => r.id === member.workspaceRoleId)
-                    ?.color ?? '#94a3b8',
-              }}
-            />
-            {member.roleName}
-          </span>
-        </td>
-        <td className="px-4 py-3 text-foreground">
-          {department?.name || 'Unassigned'}
-        </td>
-        <td className="px-4 py-3 text-foreground">
-          {cohorts.map((c) => c.name).join(', ') || 'None'}
-        </td>
-        <td className="px-4 py-3">
-          <MemberStatusBadge status={member.status} />
-        </td>
-        {canManage && (
-          <>
-            <td className="px-4 py-3 text-right text-sm tabular-nums text-muted-foreground">
-              {formatHours(stats?.thisWeekSeconds ?? 0)}
-            </td>
-            <td className="px-4 py-3 text-right text-sm tabular-nums text-muted-foreground">
-              {formatHours(stats?.totalSeconds ?? 0)}
-            </td>
-            <td className="px-4 py-3 text-right text-sm tabular-nums text-muted-foreground">
-              {formatHours(stats?.billableSeconds ?? 0)}
-            </td>
-            <td className="px-4 py-3">
-              <div className="flex items-center gap-1">
-                <IconBtn
-                  onClick={() => setShowAnalytics((v) => !v)}
-                  title="View analytics"
-                  className={showAnalytics ? 'bg-primary/10 text-primary' : ''}
-                >
-                  <BarChart2 className="h-3.5 w-3.5" />
-                </IconBtn>
-                <IconBtn onClick={() => setEditing(true)} title="Edit member">
-                  <Pencil className="h-3.5 w-3.5" />
-                </IconBtn>
-                {!isSelf && (
-                  <button
-                    type="button"
-                    onClick={handleToggleStatus}
-                    disabled={pending}
-                    className={`h-6 rounded px-2 text-xs font-semibold transition-colors disabled:opacity-50 ${
-                      member.status === 'DISABLED'
-                        ? 'bg-primary/15 text-primary hover:bg-primary/25'
-                        : 'bg-destructive/15 text-destructive hover:bg-destructive/25'
-                    }`}
-                  >
-                    {member.status === 'DISABLED' ? 'Reactivate' : 'Disable'}
-                  </button>
-                )}
-              </div>
-            </td>
-          </>
-        )}
-      </tr>
-
-      {/* ── Expandable analytics panel ── */}
-      {canManage && showAnalytics && (
-        <tr className="border-t border-border bg-muted/40">
-          <td colSpan={9} className="px-5 pb-5 pt-3">
-            <p className="m-0 mb-3 text-xs font-bold uppercase tracking-wide text-primary">
-              Analytics — {member.name}
-            </p>
-
-            {/* Stats chips */}
-            <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
-              {[
-                { label: 'This week', value: formatHours(stats?.thisWeekSeconds ?? 0) },
-                { label: 'This month', value: formatHours(stats?.thisMonthSeconds ?? 0) },
-                { label: 'All time', value: formatHours(stats?.totalSeconds ?? 0) },
-                { label: 'Billable', value: formatHours(stats?.billableSeconds ?? 0) },
-                { label: 'Entries', value: String(stats?.entryCount ?? 0) },
-              ].map((chip) => (
-                <div
-                  key={chip.label}
-                  className="rounded-lg border border-border bg-card px-3 py-2.5"
-                >
-                  <p className="m-0 text-xs text-muted-foreground">{chip.label}</p>
-                  <p className="m-0 mt-0.5 text-lg font-bold text-foreground">
-                    {chip.value}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            {/* Top projects */}
-            {stats && stats.topProjects.length > 0 ? (
-              <div>
-                <p className="m-0 mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Top projects
-                </p>
-                <div className="grid gap-2">
-                  {stats.topProjects.map(({ projectId, seconds }) => {
-                    const project = state.projects.find((p) => p.id === projectId)
-                    const pct =
-                      stats.totalSeconds > 0
-                        ? Math.round((seconds / stats.totalSeconds) * 100)
-                        : 0
-                    return (
-                      <div key={projectId} className="flex items-center gap-3">
-                        <span
-                          className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: project?.color ?? '#94a3b8' }}
-                        />
-                        <span className="w-32 shrink-0 truncate text-sm text-foreground">
-                          {project?.name ?? 'Unknown'}
-                        </span>
-                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-border">
-                          <div
-                            className="h-2 rounded-full bg-primary transition-all"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <span className="w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                          {formatHours(seconds)}
-                        </span>
-                        <span className="w-8 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                          {pct}%
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ) : (
-              <p className="m-0 text-sm text-muted-foreground">
-                No tracked entries yet.
-              </p>
-            )}
-          </td>
-        </tr>
-      )}
-    </>
   )
 }
 
@@ -1933,111 +1543,5 @@ export function SettingsScreen({ state }: { state: TrackerState }) {
         )}
       </section>
     </Page>
-  )
-}
-
-// ─── Pending Invites Panel ────────────────────────────────────────────────────
-
-function PendingInvitesPanel() {
-  const router = useRouter()
-  const { data: invites = [], refetch } = useQuery({
-    queryKey: ['workspace-invites'],
-    queryFn: () => listWorkspaceInvitesFn(),
-    staleTime: 30 * 1000,
-  })
-  const [busyId, setBusyId] = useState<string | null>(null)
-
-  if (invites.length === 0) return null
-
-  async function handleResend(id: string) {
-    setBusyId(id)
-    try {
-      await resendWorkspaceInviteFn({ data: { inviteId: id } })
-      await refetch()
-      gooeyToast.success('Invitation resent')
-    } catch (err) {
-      gooeyToast.error('Could not resend', {
-        description: err instanceof Error ? err.message : 'Please try again.',
-      })
-    } finally {
-      setBusyId(null)
-    }
-  }
-
-  async function handleRevoke(id: string) {
-    setBusyId(id)
-    try {
-      await revokeWorkspaceInviteFn({ data: { inviteId: id } })
-      await refetch()
-      await router.invalidate()
-      gooeyToast.success('Invitation revoked')
-    } catch (err) {
-      gooeyToast.error('Could not revoke', {
-        description: err instanceof Error ? err.message : 'Please try again.',
-      })
-    } finally {
-      setBusyId(null)
-    }
-  }
-
-  return (
-    <section className="rounded-lg border border-border bg-card shadow-sm">
-      <div className="border-b border-border p-4">
-        <h2 className="m-0 text-lg font-bold text-foreground">
-          Pending invitations ({invites.length})
-        </h2>
-        <p className="m-0 mt-1 text-sm text-muted-foreground">
-          These people have been sent an invite link but have not joined yet.
-        </p>
-      </div>
-      <ul className="m-0 grid list-none gap-0 p-0">
-        {invites.map((inv) => {
-          const expires = new Date(inv.expiresAt)
-          const isExpired = expires < new Date()
-          return (
-            <li
-              key={inv.id}
-              className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3 last:border-b-0"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="m-0 truncate text-sm font-semibold text-foreground">
-                  {inv.email}
-                </p>
-                <p className="m-0 mt-0.5 text-xs text-muted-foreground">
-                  {inv.roleName ?? 'Member'}
-                  {inv.departmentName ? ` · ${inv.departmentName}` : ''}
-                  {' · '}
-                  {isExpired ? (
-                    <span className="font-semibold text-amber-600 dark:text-amber-400">
-                      Expired {expires.toLocaleDateString()}
-                    </span>
-                  ) : (
-                    <>Expires {expires.toLocaleDateString()}</>
-                  )}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => void handleResend(inv.id)}
-                  disabled={busyId === inv.id}
-                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-50"
-                >
-                  Resend
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleRevoke(inv.id)}
-                  disabled={busyId === inv.id}
-                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
-                >
-                  Revoke
-                </button>
-              </div>
-            </li>
-          )
-        })}
-      </ul>
-    </section>
   )
 }

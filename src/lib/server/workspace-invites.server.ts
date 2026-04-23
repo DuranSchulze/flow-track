@@ -38,7 +38,11 @@ function generateToken(): string {
 }
 
 function getAppUrl(): string {
-  return (process.env.APP_URL ?? 'http://localhost:3000').replace(/\/$/, '')
+  return (
+    process.env.APP_URL ??
+    process.env.BETTER_AUTH_URL ??
+    'http://localhost:3000'
+  ).replace(/\/$/, '')
 }
 
 function assertOwnerOrAdmin(access: {
@@ -57,7 +61,11 @@ export async function listWorkspaceInvites() {
   const access = await requireWorkspaceAccess()
   assertOwnerOrAdmin(access)
   return prisma.workspaceInvite.findMany({
-    where: { workspaceId: access.workspace.id, acceptedAt: null, revokedAt: null },
+    where: {
+      workspaceId: access.workspace.id,
+      acceptedAt: null,
+      revokedAt: null,
+    },
     include: { workspaceRole: true, department: true },
     orderBy: { createdAt: 'desc' },
   })
@@ -80,7 +88,10 @@ export async function createWorkspaceInvite(input: {
     where: { id: input.workspaceRoleId, workspaceId: access.workspace.id },
   })
   if (!role) {
-    throw new WorkspaceInviteError('invalid_role', 'Selected role does not exist.')
+    throw new WorkspaceInviteError(
+      'invalid_role',
+      'Selected role does not exist.',
+    )
   }
 
   const existingMember = await prisma.workspaceMember.findFirst({
@@ -151,7 +162,10 @@ export async function resendWorkspaceInvite(input: { inviteId: string }) {
   })
   if (!invite) throw new WorkspaceInviteError('not_found', 'Invite not found.')
   if (invite.acceptedAt)
-    throw new WorkspaceInviteError('already_accepted', 'Invite already accepted.')
+    throw new WorkspaceInviteError(
+      'already_accepted',
+      'Invite already accepted.',
+    )
 
   const token = generateToken()
   const tokenHash = hashToken(token)

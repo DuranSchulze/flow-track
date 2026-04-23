@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Outlet, useRouterState } from '@tanstack/react-router'
 import { MembersScreen } from '#/components/time-tracker/WorkspaceScreens'
 import { getMemberAnalyticsFn, getTrackerStateFn } from '#/lib/server/tracker'
 import type { MemberStat } from '#/lib/server/tracker.server'
@@ -16,6 +16,17 @@ export const Route = createFileRoute('/app/workspace/members')({
 })
 
 function MembersRoute() {
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
+  const isDetailRoute =
+    pathname !== '/app/workspace/members' &&
+    pathname !== '/app/workspace/members/'
+
+  if (isDetailRoute) {
+    return <Outlet />
+  }
+
   const { state, memberStats } = Route.useLoaderData()
   return <MembersScreen state={state} memberStats={memberStats} />
 }

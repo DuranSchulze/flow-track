@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { Check, LogOut, Moon, Settings, Sun, UserCircle } from 'lucide-react'
@@ -23,13 +24,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
-import type { Workspace } from '#/lib/time-tracker/types'
 
 export function Navbar({
   workspace,
   user,
 }: {
-  workspace: Workspace
+  workspace: { name: string }
   user: { id: string; name: string; email: string }
 }) {
   const navigate = useNavigate()
@@ -74,27 +74,35 @@ export function Navbar({
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur">
-      <div className="flex h-16 items-center gap-4 px-4 sm:px-6">
+    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur-xl">
+      <div className="mx-auto flex h-[4.5rem] max-w-[1600px] items-center gap-4 px-4 py-3 sm:px-6">
         {/* Logo */}
         <Link
           to="/app/time-tracker"
           className="flex items-center gap-3 no-underline"
         >
-          <img
-            src="/logo192.png"
-            alt=""
-            className="h-9 w-9 rounded-lg bg-card"
-          />
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border/70 bg-card shadow-sm">
+            <img src="/logo192.png" alt="" className="h-7 w-7 rounded-md" />
+          </div>
           <div className="hidden sm:block">
-            <p className="m-0 text-sm font-bold text-foreground">Flow Track</p>
+            <p className="m-0 text-sm font-black uppercase tracking-[0.18em] text-foreground">
+              Flow Track
+            </p>
             <p className="m-0 text-xs text-muted-foreground">
               Internal workspace tracking
             </p>
           </div>
         </Link>
 
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-2">
+          <div className="hidden items-center gap-2 rounded-full border border-border/70 bg-card/80 px-3 py-2 text-xs font-semibold text-muted-foreground lg:inline-flex">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--primary)] opacity-70" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[var(--primary)]" />
+            </span>
+            Workspace live
+          </div>
+
           <WorkspaceSwitcher currentWorkspaceName={workspace.name} />
 
           <DropdownMenu>
@@ -103,7 +111,7 @@ export function Navbar({
                 variant="ghost"
                 size="icon"
                 title="Account & appearance"
-                className="text-muted-foreground hover:text-foreground"
+                className="rounded-full border border-transparent text-muted-foreground hover:border-border hover:bg-card hover:text-foreground"
               >
                 <UserCircle className="h-4 w-4" />
               </Button>
@@ -212,7 +220,7 @@ function ModePill({
 }: {
   active: boolean
   onClick: () => void
-  icon: React.ReactNode
+  icon: ReactNode
   label: string
 }) {
   return (

@@ -3,6 +3,11 @@ import { z } from 'zod'
 import { prisma } from '#/db'
 import { requireWorkspaceAccess } from './workspace-access.server'
 import type { TrackerState } from '#/lib/time-tracker/types'
+import {
+  computeEffectiveRate,
+  normalizeCurrency,
+  toFiniteRate,
+} from '#/lib/time-tracker/billing'
 
 const entryInputSchema = z.object({
   description: z.string().trim().min(1),
@@ -69,7 +74,9 @@ async function assertWorkspaceCatalogs(
   }
 
   if (tags.length !== new Set(tagIds).size) {
-    throw new Error('One or more selected tags are not available in this workspace.')
+    throw new Error(
+      'One or more selected tags are not available in this workspace.',
+    )
   }
 }
 
@@ -85,288 +92,291 @@ function calculateDuration(startedAt: Date, endedAt: Date | null) {
 }
 
 export async function getTrackerState(): Promise<TrackerState> {
-    const access = await requireWorkspaceAccess()
-    const workspaceId = access.workspace.id
-    const memberId = access.member.id
+  const access = await requireWorkspaceAccess()
+  const workspaceId = access.workspace.id
+  const memberId = access.member.id
 
-    const [roles, departments, cohorts, projects, tags, members, entries] =
-      await Promise.all([
-        prisma.workspaceRole.findMany({
-          where: { workspaceId },
-          orderBy: [{ permissionLevel: 'asc' }, { name: 'asc' }],
-        }),
-        prisma.department.findMany({
-          where: { workspaceId },
-          orderBy: { name: 'asc' },
-        }),
-        prisma.cohort.findMany({
-          where: { workspaceId },
-          orderBy: { name: 'asc' },
-        }),
-        prisma.project.findMany({
-          where: { workspaceId, archived: false },
-          orderBy: { name: 'asc' },
-        }),
-        prisma.tag.findMany({
-          where: { workspaceId, archived: false },
-          orderBy: { name: 'asc' },
-        }),
-        prisma.workspaceMember.findMany({
-          where: { workspaceId },
-          include: {
-            user: true,
-            workspaceRole: true,
-            cohorts: {
-              include: {
-                cohort: true,
-              },
+  const [roles, departments, cohorts, projects, tags, members, entries] =
+    await Promise.all([
+      prisma.workspaceRole.findMany({
+        where: { workspaceId },
+        orderBy: [{ permissionLevel: 'asc' }, { name: 'asc' }],
+      }),
+      prisma.department.findMany({
+        where: { workspaceId },
+        orderBy: { name: 'asc' },
+      }),
+      prisma.cohort.findMany({
+        where: { workspaceId },
+        orderBy: { name: 'asc' },
+      }),
+      prisma.project.findMany({
+        where: { workspaceId, archived: false },
+        orderBy: { name: 'asc' },
+      }),
+      prisma.tag.findMany({
+        where: { workspaceId, archived: false },
+        orderBy: { name: 'asc' },
+      }),
+      prisma.workspaceMember.findMany({
+        where: { workspaceId },
+        include: {
+          user: true,
+          workspaceRole: true,
+          cohorts: {
+            include: {
+              cohort: true,
             },
           },
-          orderBy: { email: 'asc' },
-        }),
-        prisma.timeEntry.findMany({
-          where: {
-            workspaceId,
-            workspaceMemberId: memberId,
-          },
-          include: {
-            tags: true,
-          },
-          orderBy: {
-            startedAt: 'desc',
-          },
-        }),
-      ])
+        },
+        orderBy: { email: 'asc' },
+      }),
+      prisma.timeEntry.findMany({
+        where: {
+          workspaceId,
+          workspaceMemberId: memberId,
+        },
+        include: {
+          tags: true,
+        },
+        orderBy: {
+          startedAt: 'desc',
+        },
+      }),
+    ])
 
-    return {
-      workspace: {
-        id: access.workspace.id,
-        name: access.workspace.name,
-        timezone: access.workspace.timezone,
-        defaultBillableRate: Number(access.workspace.defaultBillableRate),
-        billableCurrency: access.workspace.billableCurrency,
-      },
-      currentMemberId: memberId,
-      roles: roles.map((role) => ({
-        id: role.id,
-        name: role.name,
-        permissionLevel: role.permissionLevel,
-        color: role.color,
-      })),
-      departments: departments.map((department) => ({
-        id: department.id,
-        name: department.name,
-      })),
-      cohorts: cohorts.map((cohort) => ({
-        id: cohort.id,
-        name: cohort.name,
-      })),
-      projects: projects.map((project) => ({
-        id: project.id,
-        name: project.name,
-        color: project.color,
-      })),
-      tags: tags.map((tag) => ({
-        id: tag.id,
-        name: tag.name,
-        color: tag.color,
-      })),
-      members: members.map((member) => ({
-        id: member.id,
-        name: member.user?.name ?? member.email,
-        email: member.email,
-        image: member.user?.image ?? null,
-        workspaceRoleId: member.workspaceRoleId ?? '',
-        roleName: member.workspaceRole?.name ?? 'No role',
-        permissionLevel: member.workspaceRole?.permissionLevel ?? 'EMPLOYEE',
-        departmentId: member.departmentId ?? '',
-        cohortIds: member.cohorts.map((cohortMember) => cohortMember.cohortId),
-        status: member.status,
-        billableRate: member.billableRate == null ? null : Number(member.billableRate),
-      })),
-      entries: entries.map((entry) => ({
-        id: entry.id,
-        workspaceMemberId: entry.workspaceMemberId,
-        description: entry.description,
-        projectId: entry.projectId ?? '',
-        tagIds: entry.tags.map((tag) => tag.tagId),
-        billable: entry.billable,
-        startedAt: entry.startedAt.toISOString(),
-        endedAt: toIso(entry.endedAt),
-        durationSeconds: entry.durationSeconds,
-        notes: entry.notes ?? '',
-      })),
-    }
+  return {
+    workspace: {
+      id: access.workspace.id,
+      name: access.workspace.name,
+      timezone: access.workspace.timezone,
+      defaultBillableRate: Number(access.workspace.defaultBillableRate),
+      billableCurrency: access.workspace.billableCurrency,
+    },
+    currentMemberId: memberId,
+    roles: roles.map((role) => ({
+      id: role.id,
+      name: role.name,
+      permissionLevel: role.permissionLevel,
+      color: role.color,
+    })),
+    departments: departments.map((department) => ({
+      id: department.id,
+      name: department.name,
+    })),
+    cohorts: cohorts.map((cohort) => ({
+      id: cohort.id,
+      name: cohort.name,
+    })),
+    projects: projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      color: project.color,
+    })),
+    tags: tags.map((tag) => ({
+      id: tag.id,
+      name: tag.name,
+      color: tag.color,
+    })),
+    members: members.map((member) => ({
+      id: member.id,
+      name: member.user?.name ?? member.email,
+      email: member.email,
+      image: member.user?.image ?? null,
+      workspaceRoleId: member.workspaceRoleId ?? '',
+      roleName: member.workspaceRole?.name ?? 'No role',
+      permissionLevel: member.workspaceRole?.permissionLevel ?? 'EMPLOYEE',
+      departmentId: member.departmentId ?? '',
+      cohortIds: member.cohorts.map((cohortMember) => cohortMember.cohortId),
+      status: member.status,
+      billableRate:
+        member.billableRate == null ? null : Number(member.billableRate),
+    })),
+    entries: entries.map((entry) => ({
+      id: entry.id,
+      workspaceMemberId: entry.workspaceMemberId,
+      description: entry.description,
+      projectId: entry.projectId ?? '',
+      tagIds: entry.tags.map((tag) => tag.tagId),
+      billable: entry.billable,
+      startedAt: entry.startedAt.toISOString(),
+      endedAt: toIso(entry.endedAt),
+      durationSeconds: entry.durationSeconds,
+      notes: entry.notes ?? '',
+    })),
+  }
 }
 
 export async function startTimer(data: z.infer<typeof startTimerSchema>) {
-    const access = await requireWorkspaceAccess()
-    const tagIds = [...new Set(data.tagIds.filter(Boolean))]
+  const access = await requireWorkspaceAccess()
+  const tagIds = [...new Set(data.tagIds.filter(Boolean))]
 
-    await assertWorkspaceCatalogs(access.workspace.id, data.projectId, tagIds)
+  await assertWorkspaceCatalogs(access.workspace.id, data.projectId, tagIds)
 
-    const activeEntry = await prisma.timeEntry.findFirst({
-      where: {
-        workspaceId: access.workspace.id,
-        workspaceMemberId: access.member.id,
-        endedAt: null,
+  const activeEntry = await prisma.timeEntry.findFirst({
+    where: {
+      workspaceId: access.workspace.id,
+      workspaceMemberId: access.member.id,
+      endedAt: null,
+    },
+  })
+
+  if (activeEntry) {
+    throw new Error('Stop your current timer before starting a new one.')
+  }
+
+  await prisma.timeEntry.create({
+    data: {
+      workspaceId: access.workspace.id,
+      workspaceMemberId: access.member.id,
+      description: data.description,
+      projectId: data.projectId,
+      billable: data.billable,
+      startedAt: new Date(),
+      endedAt: null,
+      durationSeconds: 0,
+      notes: '',
+      tags: {
+        create: tagIds.map((tagId) => ({ tagId })),
       },
-    })
-
-    if (activeEntry) {
-      throw new Error('Stop your current timer before starting a new one.')
-    }
-
-    await prisma.timeEntry.create({
-      data: {
-        workspaceId: access.workspace.id,
-        workspaceMemberId: access.member.id,
-        description: data.description,
-        projectId: data.projectId,
-        billable: data.billable,
-        startedAt: new Date(),
-        endedAt: null,
-        durationSeconds: 0,
-        notes: '',
-        tags: {
-          create: tagIds.map((tagId) => ({ tagId })),
-        },
-      },
-    })
+    },
+  })
 }
 
 export async function stopTimer(data: z.infer<typeof entryIdSchema>) {
-    const access = await requireWorkspaceAccess()
-    const entry = await prisma.timeEntry.findFirst({
-      where: {
-        id: data.id,
-        workspaceId: access.workspace.id,
-        workspaceMemberId: access.member.id,
-        endedAt: null,
-      },
-    })
+  const access = await requireWorkspaceAccess()
+  const entry = await prisma.timeEntry.findFirst({
+    where: {
+      id: data.id,
+      workspaceId: access.workspace.id,
+      workspaceMemberId: access.member.id,
+      endedAt: null,
+    },
+  })
 
-    if (!entry) {
-      return
-    }
+  if (!entry) {
+    return
+  }
 
-    const endedAt = new Date()
-    await prisma.timeEntry.update({
-      where: { id: entry.id },
-      data: {
-        endedAt,
-        durationSeconds: calculateDuration(entry.startedAt, endedAt),
-      },
-    })
+  const endedAt = new Date()
+  await prisma.timeEntry.update({
+    where: { id: entry.id },
+    data: {
+      endedAt,
+      durationSeconds: calculateDuration(entry.startedAt, endedAt),
+    },
+  })
 }
 
-export async function createManualEntry(data: z.infer<typeof entryInputSchema>) {
-    const access = await requireWorkspaceAccess()
-    const tagIds = [...new Set(data.tagIds.filter(Boolean))]
-    const startedAt = new Date(data.startedAt)
-    const endedAt = data.endedAt ? new Date(data.endedAt) : null
+export async function createManualEntry(
+  data: z.infer<typeof entryInputSchema>,
+) {
+  const access = await requireWorkspaceAccess()
+  const tagIds = [...new Set(data.tagIds.filter(Boolean))]
+  const startedAt = new Date(data.startedAt)
+  const endedAt = data.endedAt ? new Date(data.endedAt) : null
 
-    await assertWorkspaceCatalogs(access.workspace.id, data.projectId, tagIds)
+  await assertWorkspaceCatalogs(access.workspace.id, data.projectId, tagIds)
 
-    await prisma.timeEntry.create({
-      data: {
-        workspaceId: access.workspace.id,
-        workspaceMemberId: access.member.id,
-        description: data.description,
-        projectId: data.projectId,
-        billable: data.billable,
-        startedAt,
-        endedAt,
-        durationSeconds: calculateDuration(startedAt, endedAt),
-        notes: data.notes,
-        tags: {
-          create: tagIds.map((tagId) => ({ tagId })),
-        },
+  await prisma.timeEntry.create({
+    data: {
+      workspaceId: access.workspace.id,
+      workspaceMemberId: access.member.id,
+      description: data.description,
+      projectId: data.projectId,
+      billable: data.billable,
+      startedAt,
+      endedAt,
+      durationSeconds: calculateDuration(startedAt, endedAt),
+      notes: data.notes,
+      tags: {
+        create: tagIds.map((tagId) => ({ tagId })),
       },
-    })
+    },
+  })
 }
 
 export async function updateEntry(data: z.infer<typeof updateEntrySchema>) {
-    const access = await requireWorkspaceAccess()
-    const tagIds = [...new Set(data.tagIds.filter(Boolean))]
-    const startedAt = new Date(data.startedAt)
-    const endedAt = data.endedAt ? new Date(data.endedAt) : null
+  const access = await requireWorkspaceAccess()
+  const tagIds = [...new Set(data.tagIds.filter(Boolean))]
+  const startedAt = new Date(data.startedAt)
+  const endedAt = data.endedAt ? new Date(data.endedAt) : null
 
-    await assertWorkspaceCatalogs(access.workspace.id, data.projectId, tagIds)
+  await assertWorkspaceCatalogs(access.workspace.id, data.projectId, tagIds)
 
-    const entry = await prisma.timeEntry.findFirstOrThrow({
-      where: {
-        id: data.id,
-        workspaceId: access.workspace.id,
-        workspaceMemberId: access.member.id,
-      },
-    })
+  const entry = await prisma.timeEntry.findFirstOrThrow({
+    where: {
+      id: data.id,
+      workspaceId: access.workspace.id,
+      workspaceMemberId: access.member.id,
+    },
+  })
 
-    await prisma.timeEntry.update({
-      where: {
-        id: entry.id,
+  await prisma.timeEntry.update({
+    where: {
+      id: entry.id,
+    },
+    data: {
+      description: data.description,
+      projectId: data.projectId,
+      billable: data.billable,
+      startedAt,
+      endedAt,
+      durationSeconds: calculateDuration(startedAt, endedAt),
+      notes: data.notes,
+      tags: {
+        deleteMany: {},
+        create: tagIds.map((tagId) => ({ tagId })),
       },
-      data: {
-        description: data.description,
-        projectId: data.projectId,
-        billable: data.billable,
-        startedAt,
-        endedAt,
-        durationSeconds: calculateDuration(startedAt, endedAt),
-        notes: data.notes,
-        tags: {
-          deleteMany: {},
-          create: tagIds.map((tagId) => ({ tagId })),
-        },
-      },
-    })
+    },
+  })
 }
 
 export async function deleteEntry(data: z.infer<typeof entryIdSchema>) {
-    const access = await requireWorkspaceAccess()
+  const access = await requireWorkspaceAccess()
 
-    await prisma.timeEntry.deleteMany({
-      where: {
-        id: data.id,
-        workspaceId: access.workspace.id,
-        workspaceMemberId: access.member.id,
-      },
-    })
+  await prisma.timeEntry.deleteMany({
+    where: {
+      id: data.id,
+      workspaceId: access.workspace.id,
+      workspaceMemberId: access.member.id,
+    },
+  })
 }
 
 export async function duplicateEntry(data: z.infer<typeof entryIdSchema>) {
-    const access = await requireWorkspaceAccess()
-    const entry = await prisma.timeEntry.findFirstOrThrow({
-      where: {
-        id: data.id,
-        workspaceId: access.workspace.id,
-        workspaceMemberId: access.member.id,
-      },
-      include: {
-        tags: true,
-      },
-    })
-    const startedAt = new Date()
-    startedAt.setMinutes(0, 0, 0)
-    const durationSeconds = Math.max(entry.durationSeconds, 3600)
-    const endedAt = new Date(startedAt.getTime() + durationSeconds * 1000)
+  const access = await requireWorkspaceAccess()
+  const entry = await prisma.timeEntry.findFirstOrThrow({
+    where: {
+      id: data.id,
+      workspaceId: access.workspace.id,
+      workspaceMemberId: access.member.id,
+    },
+    include: {
+      tags: true,
+    },
+  })
+  const startedAt = new Date()
+  startedAt.setMinutes(0, 0, 0)
+  const durationSeconds = Math.max(entry.durationSeconds, 3600)
+  const endedAt = new Date(startedAt.getTime() + durationSeconds * 1000)
 
-    await prisma.timeEntry.create({
-      data: {
-        workspaceId: access.workspace.id,
-        workspaceMemberId: access.member.id,
-        description: entry.description,
-        projectId: entry.projectId,
-        billable: entry.billable,
-        startedAt,
-        endedAt,
-        durationSeconds,
-        notes: entry.notes,
-        tags: {
-          create: entry.tags.map((tag) => ({ tagId: tag.tagId })),
-        },
+  await prisma.timeEntry.create({
+    data: {
+      workspaceId: access.workspace.id,
+      workspaceMemberId: access.member.id,
+      description: entry.description,
+      projectId: entry.projectId,
+      billable: entry.billable,
+      startedAt,
+      endedAt,
+      durationSeconds,
+      notes: entry.notes,
+      tags: {
+        create: entry.tags.map((tag) => ({ tagId: tag.tagId })),
       },
-    })
+    },
+  })
 }
 
 const inviteMemberSchema = z.object({
@@ -381,21 +391,28 @@ const createRoleSchema = z.object({
   color: z.string().default('#6366f1'),
 })
 
-function assertOwnerOrAdmin(access: { member: { workspaceRole: { permissionLevel: string } | null } }) {
+function assertOwnerOrAdmin(access: {
+  member: { workspaceRole: { permissionLevel: string } | null }
+}) {
   const level = access.member.workspaceRole?.permissionLevel
   if (level !== 'OWNER' && level !== 'ADMIN') {
     throw new Error('Only Owners and Admins can perform this action.')
   }
 }
 
-export async function createWorkspaceMember(data: z.infer<typeof inviteMemberSchema>) {
+export async function createWorkspaceMember(
+  data: z.infer<typeof inviteMemberSchema>,
+) {
   const access = await requireWorkspaceAccess()
   assertOwnerOrAdmin(access)
 
   const email = data.email.toLowerCase()
 
   const existing = await prisma.workspaceMember.findFirst({
-    where: { workspaceId: access.workspace.id, email: { equals: email, mode: 'insensitive' } },
+    where: {
+      workspaceId: access.workspace.id,
+      email: { equals: email, mode: 'insensitive' },
+    },
   })
 
   if (existing) {
@@ -422,16 +439,23 @@ export async function createWorkspaceMember(data: z.infer<typeof inviteMemberSch
   })
 }
 
-export async function createWorkspaceRole(data: z.infer<typeof createRoleSchema>) {
+export async function createWorkspaceRole(
+  data: z.infer<typeof createRoleSchema>,
+) {
   const access = await requireWorkspaceAccess()
   assertOwnerOrAdmin(access)
 
   const existing = await prisma.workspaceRole.findFirst({
-    where: { workspaceId: access.workspace.id, name: { equals: data.name, mode: 'insensitive' } },
+    where: {
+      workspaceId: access.workspace.id,
+      name: { equals: data.name, mode: 'insensitive' },
+    },
   })
 
   if (existing) {
-    throw new Error(`A role named "${data.name}" already exists in this workspace.`)
+    throw new Error(
+      `A role named "${data.name}" already exists in this workspace.`,
+    )
   }
 
   await prisma.workspaceRole.create({
@@ -463,12 +487,20 @@ export async function createProject(data: z.infer<typeof createProjectSchema>) {
   const access = await requireWorkspaceAccess()
 
   const existing = await prisma.project.findFirst({
-    where: { workspaceId: access.workspace.id, name: { equals: data.name, mode: 'insensitive' } },
+    where: {
+      workspaceId: access.workspace.id,
+      name: { equals: data.name, mode: 'insensitive' },
+    },
   })
-  if (existing) throw new Error(`A project named "${data.name}" already exists.`)
+  if (existing)
+    throw new Error(`A project named "${data.name}" already exists.`)
 
   await prisma.project.create({
-    data: { workspaceId: access.workspace.id, name: data.name, color: data.color },
+    data: {
+      workspaceId: access.workspace.id,
+      name: data.name,
+      color: data.color,
+    },
   })
 }
 
@@ -509,12 +541,19 @@ export async function createTag(data: z.infer<typeof createTagSchema>) {
   const access = await requireWorkspaceAccess()
 
   const existing = await prisma.tag.findFirst({
-    where: { workspaceId: access.workspace.id, name: { equals: data.name, mode: 'insensitive' } },
+    where: {
+      workspaceId: access.workspace.id,
+      name: { equals: data.name, mode: 'insensitive' },
+    },
   })
   if (existing) throw new Error(`A tag named "${data.name}" already exists.`)
 
   await prisma.tag.create({
-    data: { workspaceId: access.workspace.id, name: data.name, color: data.color },
+    data: {
+      workspaceId: access.workspace.id,
+      name: data.name,
+      color: data.color,
+    },
   })
 }
 
@@ -554,14 +593,20 @@ const updateDepartmentSchema = z.object({
   headMemberId: z.string().optional(),
 })
 
-export async function createDepartment(data: z.infer<typeof createDepartmentSchema>) {
+export async function createDepartment(
+  data: z.infer<typeof createDepartmentSchema>,
+) {
   const access = await requireWorkspaceAccess()
   assertOwnerOrAdmin(access)
 
   const existing = await prisma.department.findFirst({
-    where: { workspaceId: access.workspace.id, name: { equals: data.name, mode: 'insensitive' } },
+    where: {
+      workspaceId: access.workspace.id,
+      name: { equals: data.name, mode: 'insensitive' },
+    },
   })
-  if (existing) throw new Error(`A department named "${data.name}" already exists.`)
+  if (existing)
+    throw new Error(`A department named "${data.name}" already exists.`)
 
   await prisma.department.create({
     data: {
@@ -573,7 +618,9 @@ export async function createDepartment(data: z.infer<typeof createDepartmentSche
   })
 }
 
-export async function updateDepartment(data: z.infer<typeof updateDepartmentSchema>) {
+export async function updateDepartment(
+  data: z.infer<typeof updateDepartmentSchema>,
+) {
   const access = await requireWorkspaceAccess()
   assertOwnerOrAdmin(access)
 
@@ -583,7 +630,9 @@ export async function updateDepartment(data: z.infer<typeof updateDepartmentSche
       name: data.name,
       description: data.description,
       ...(data.color !== undefined && { color: data.color }),
-      ...(data.headMemberId !== undefined && { headMemberId: data.headMemberId || null }),
+      ...(data.headMemberId !== undefined && {
+        headMemberId: data.headMemberId || null,
+      }),
     },
   })
 }
@@ -614,7 +663,10 @@ export async function createCohort(data: z.infer<typeof createCohortSchema>) {
   assertOwnerOrAdmin(access)
 
   const existing = await prisma.cohort.findFirst({
-    where: { workspaceId: access.workspace.id, name: { equals: data.name, mode: 'insensitive' } },
+    where: {
+      workspaceId: access.workspace.id,
+      name: { equals: data.name, mode: 'insensitive' },
+    },
   })
   if (existing) throw new Error(`A cohort named "${data.name}" already exists.`)
 
@@ -657,7 +709,84 @@ const setMemberStatusSchema = z.object({
   status: z.enum(['ACTIVE', 'DISABLED']),
 })
 
-export async function updateWorkspaceMember(data: z.infer<typeof updateWorkspaceMemberSchema>) {
+const updateWorkspaceBillingSchema = z.object({
+  defaultBillableRate: z.number().finite().min(0),
+  billableCurrency: z.string().trim().min(3).max(8),
+})
+
+const updateMemberBillableRateSchema = z.object({
+  memberId: z.string().min(1),
+  billableRate: z.number().finite().min(0).nullable(),
+})
+
+type CurrencyOption = {
+  code: string
+  name: string
+}
+
+const FALLBACK_CURRENCIES: CurrencyOption[] = [
+  { code: 'PHP', name: 'Philippine Peso' },
+  { code: 'USD', name: 'United States Dollar' },
+  { code: 'EUR', name: 'Euro' },
+  { code: 'GBP', name: 'British Pound' },
+  { code: 'JPY', name: 'Japanese Yen' },
+  { code: 'AUD', name: 'Australian Dollar' },
+  { code: 'CAD', name: 'Canadian Dollar' },
+  { code: 'SGD', name: 'Singapore Dollar' },
+  { code: 'HKD', name: 'Hong Kong Dollar' },
+  { code: 'CNY', name: 'Chinese Yuan' },
+  { code: 'KRW', name: 'South Korean Won' },
+  { code: 'INR', name: 'Indian Rupee' },
+]
+
+let currencyCache: {
+  expiresAt: number
+  options: CurrencyOption[]
+} | null = null
+
+function normalizeCurrencyOptions(options: CurrencyOption[]) {
+  const unique = new Map<string, CurrencyOption>()
+  for (const option of options) {
+    const code = normalizeCurrency(option.code)
+    unique.set(code, { code, name: option.name.trim() || code })
+  }
+  return [...unique.values()].sort((a, b) => a.code.localeCompare(b.code))
+}
+
+const memberIdSchema = z.object({
+  memberId: z.string().min(1),
+})
+
+const employeeProfileSchema = z.object({
+  employeeNumber: z.string().trim().max(50).optional().or(z.literal('')),
+  positionTitle: z.string().trim().max(100).optional().or(z.literal('')),
+  employmentType: z
+    .enum(['FULL_TIME', 'PART_TIME', 'CONTRACTOR', 'INTERN', 'PROBATIONARY'])
+    .optional(),
+  employmentStatus: z
+    .enum(['ACTIVE', 'ON_LEAVE', 'RESIGNED', 'TERMINATED'])
+    .optional(),
+  hireDate: z.string().date().optional().or(z.literal('')),
+  regularizationDate: z.string().date().optional().or(z.literal('')),
+  separationDate: z.string().date().optional().or(z.literal('')),
+})
+
+const governmentIdsSchema = z.object({
+  sssNumber: z.string().trim().max(25).optional().or(z.literal('')),
+  philHealthNumber: z.string().trim().max(25).optional().or(z.literal('')),
+  tinNumber: z.string().trim().max(25).optional().or(z.literal('')),
+  pagIbigNumber: z.string().trim().max(25).optional().or(z.literal('')),
+})
+
+const updateMemberDetailSchema = z.object({
+  memberId: z.string().min(1),
+  employeeProfile: employeeProfileSchema.optional(),
+  governmentIds: governmentIdsSchema.optional(),
+})
+
+export async function updateWorkspaceMember(
+  data: z.infer<typeof updateWorkspaceMemberSchema>,
+) {
   const access = await requireWorkspaceAccess()
   assertOwnerOrAdmin(access)
 
@@ -670,15 +799,20 @@ export async function updateWorkspaceMember(data: z.infer<typeof updateWorkspace
     const roleExists = await prisma.workspaceRole.findFirst({
       where: { id: data.workspaceRoleId, workspaceId: access.workspace.id },
     })
-    if (!roleExists) throw new Error('Selected role does not exist in this workspace.')
+    if (!roleExists)
+      throw new Error('Selected role does not exist in this workspace.')
   }
 
   await prisma.$transaction(async (tx) => {
     await tx.workspaceMember.update({
       where: { id: data.memberId },
       data: {
-        ...(data.workspaceRoleId !== undefined && { workspaceRoleId: data.workspaceRoleId }),
-        ...(data.departmentId !== undefined && { departmentId: data.departmentId || null }),
+        ...(data.workspaceRoleId !== undefined && {
+          workspaceRoleId: data.workspaceRoleId,
+        }),
+        ...(data.departmentId !== undefined && {
+          departmentId: data.departmentId || null,
+        }),
       },
     })
 
@@ -686,14 +820,19 @@ export async function updateWorkspaceMember(data: z.infer<typeof updateWorkspace
       await tx.cohortMember.deleteMany({ where: { memberId: data.memberId } })
       if (data.cohortIds.length > 0) {
         await tx.cohortMember.createMany({
-          data: data.cohortIds.map((cohortId) => ({ cohortId, memberId: data.memberId })),
+          data: data.cohortIds.map((cohortId) => ({
+            cohortId,
+            memberId: data.memberId,
+          })),
         })
       }
     }
   })
 }
 
-export async function setMemberStatus(data: z.infer<typeof setMemberStatusSchema>) {
+export async function setMemberStatus(
+  data: z.infer<typeof setMemberStatusSchema>,
+) {
   const access = await requireWorkspaceAccess()
   assertOwnerOrAdmin(access)
 
@@ -710,6 +849,298 @@ export async function setMemberStatus(data: z.infer<typeof setMemberStatusSchema
   await prisma.workspaceMember.update({
     where: { id: data.memberId },
     data: { status: data.status },
+  })
+}
+
+export async function updateWorkspaceBilling(
+  data: z.infer<typeof updateWorkspaceBillingSchema>,
+) {
+  const access = await requireWorkspaceAccess()
+  assertOwnerOrAdmin(access)
+
+  await prisma.workspace.update({
+    where: { id: access.workspace.id },
+    data: {
+      defaultBillableRate: toFiniteRate(data.defaultBillableRate),
+      billableCurrency: normalizeCurrency(data.billableCurrency),
+    },
+  })
+}
+
+export async function updateMemberBillableRate(
+  data: z.infer<typeof updateMemberBillableRateSchema>,
+) {
+  const access = await requireWorkspaceAccess()
+  assertOwnerOrAdmin(access)
+
+  const target = await prisma.workspaceMember.findFirst({
+    where: { id: data.memberId, workspaceId: access.workspace.id },
+  })
+  if (!target) throw new Error('Member not found in this workspace.')
+
+  await prisma.workspaceMember.update({
+    where: { id: data.memberId },
+    data: {
+      billableRate:
+        data.billableRate == null ? null : toFiniteRate(data.billableRate),
+    },
+  })
+}
+
+export async function getCurrencyOptions() {
+  if (currencyCache && currencyCache.expiresAt > Date.now()) {
+    return currencyCache.options
+  }
+
+  try {
+    const response = await fetch('https://api.frankfurter.dev/v2/currencies')
+    if (!response.ok) throw new Error('Currency list request failed.')
+
+    const data = (await response.json()) as unknown
+    const parsed = Array.isArray(data)
+      ? data
+          .filter(
+            (item): item is { iso_code: string; name: string } =>
+              item != null &&
+              typeof item === 'object' &&
+              typeof item.iso_code === 'string' &&
+              typeof item.name === 'string',
+          )
+          .map((item) => ({ code: item.iso_code, name: item.name }))
+      : data && typeof data === 'object'
+        ? Object.entries(data as Record<string, unknown>)
+            .filter(
+              (entry): entry is [string, string] =>
+                typeof entry[1] === 'string',
+            )
+            .map(([code, name]) => ({ code, name }))
+        : []
+
+    const options = normalizeCurrencyOptions([
+      ...FALLBACK_CURRENCIES,
+      ...parsed,
+    ])
+    currencyCache = {
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+      options,
+    }
+    return options
+  } catch {
+    return normalizeCurrencyOptions(FALLBACK_CURRENCIES)
+  }
+}
+
+function toDateOnly(value?: string | null) {
+  return value ? new Date(value) : null
+}
+
+function fromDateOnly(value?: Date | null) {
+  return value ? value.toISOString().slice(0, 10) : ''
+}
+
+export async function getMemberDetail(data: z.infer<typeof memberIdSchema>) {
+  const access = await requireWorkspaceAccess()
+  const canManage =
+    access.member.workspaceRole?.permissionLevel === 'OWNER' ||
+    access.member.workspaceRole?.permissionLevel === 'ADMIN'
+
+  const member = await prisma.workspaceMember.findFirst({
+    where: { id: data.memberId, workspaceId: access.workspace.id },
+    include: {
+      user: {
+        include: {
+          profile: {
+            include: { address: true },
+          },
+        },
+      },
+      workspaceRole: true,
+      department: true,
+      cohorts: { include: { cohort: true } },
+      employeeProfile: {
+        include: { governmentIds: true },
+      },
+    },
+  })
+  if (!member) throw new Error('Member not found in this workspace.')
+
+  const billableEntries = await prisma.timeEntry.findMany({
+    where: {
+      workspaceId: access.workspace.id,
+      workspaceMemberId: member.id,
+      billable: true,
+    },
+    select: { durationSeconds: true },
+  })
+  const billableSeconds = billableEntries.reduce(
+    (sum, entry) => sum + entry.durationSeconds,
+    0,
+  )
+
+  const memberRate =
+    member.billableRate == null
+      ? null
+      : toFiniteRate(Number(member.billableRate))
+  const defaultRate = toFiniteRate(Number(access.workspace.defaultBillableRate))
+  const effectiveRate = computeEffectiveRate(memberRate, defaultRate)
+  const billableCurrency = normalizeCurrency(access.workspace.billableCurrency)
+  const employeeProfile = member.employeeProfile
+  const profile = member.user?.profile
+
+  return {
+    canManage,
+    workspace: {
+      id: access.workspace.id,
+      name: access.workspace.name,
+      defaultBillableRate: defaultRate,
+      billableCurrency,
+    },
+    member: {
+      id: member.id,
+      name: member.user?.name ?? member.email,
+      email: member.email,
+      image: member.user?.image ?? null,
+      status: member.status,
+      billableRate: canManage ? memberRate : null,
+      effectiveRate: canManage ? effectiveRate : null,
+      billableSeconds: canManage ? billableSeconds : 0,
+      earningsPreview: canManage
+        ? toFiniteRate((billableSeconds / 3600) * effectiveRate)
+        : 0,
+      role: member.workspaceRole
+        ? {
+            id: member.workspaceRole.id,
+            name: member.workspaceRole.name,
+            permissionLevel: member.workspaceRole.permissionLevel,
+            color: member.workspaceRole.color,
+          }
+        : null,
+      department: member.department
+        ? { id: member.department.id, name: member.department.name }
+        : null,
+      cohorts: member.cohorts.map((cohortMember) => ({
+        id: cohortMember.cohort.id,
+        name: cohortMember.cohort.name,
+      })),
+      personal: {
+        firstName: profile?.firstName ?? '',
+        middleName: profile?.middleName ?? '',
+        lastName: profile?.lastName ?? '',
+        contactNumber: profile?.contactNumber ?? '',
+        birthDate: fromDateOnly(profile?.birthDate),
+        gender: profile?.gender ?? '',
+        maritalStatus: profile?.maritalStatus ?? '',
+        address: profile?.address
+          ? {
+              buildingNo: profile.address.buildingNo ?? '',
+              street: profile.address.street ?? '',
+              city: profile.address.city ?? '',
+              province: profile.address.province ?? '',
+              postalCode: profile.address.postalCode ?? '',
+              country: profile.address.country,
+            }
+          : null,
+      },
+      employeeProfile:
+        canManage && employeeProfile
+          ? {
+              employeeNumber: employeeProfile.employeeNumber ?? '',
+              positionTitle: employeeProfile.positionTitle ?? '',
+              employmentType: employeeProfile.employmentType,
+              employmentStatus: employeeProfile.employmentStatus,
+              hireDate: fromDateOnly(employeeProfile.hireDate),
+              regularizationDate: fromDateOnly(
+                employeeProfile.regularizationDate,
+              ),
+              separationDate: fromDateOnly(employeeProfile.separationDate),
+            }
+          : null,
+      governmentIds:
+        canManage && employeeProfile?.governmentIds
+          ? {
+              sssNumber: employeeProfile.governmentIds.sssNumber ?? '',
+              philHealthNumber:
+                employeeProfile.governmentIds.philHealthNumber ?? '',
+              tinNumber: employeeProfile.governmentIds.tinNumber ?? '',
+              pagIbigNumber: employeeProfile.governmentIds.pagIbigNumber ?? '',
+            }
+          : null,
+    },
+  }
+}
+
+export async function updateMemberDetail(
+  data: z.infer<typeof updateMemberDetailSchema>,
+) {
+  const access = await requireWorkspaceAccess()
+  assertOwnerOrAdmin(access)
+
+  const target = await prisma.workspaceMember.findFirst({
+    where: { id: data.memberId, workspaceId: access.workspace.id },
+  })
+  if (!target) throw new Error('Member not found in this workspace.')
+
+  await prisma.$transaction(async (tx) => {
+    let employeeProfileId: string | null = null
+
+    if (data.employeeProfile) {
+      const e = data.employeeProfile
+      const profile = await tx.employeeProfile.upsert({
+        where: { workspaceMemberId: data.memberId },
+        create: {
+          workspaceMemberId: data.memberId,
+          employeeNumber: emptyToNull(e.employeeNumber),
+          positionTitle: emptyToNull(e.positionTitle),
+          employmentType: e.employmentType ?? 'FULL_TIME',
+          employmentStatus: e.employmentStatus ?? 'ACTIVE',
+          hireDate: toDateOnly(e.hireDate),
+          regularizationDate: toDateOnly(e.regularizationDate),
+          separationDate: toDateOnly(e.separationDate),
+        },
+        update: {
+          employeeNumber: emptyToNull(e.employeeNumber),
+          positionTitle: emptyToNull(e.positionTitle),
+          employmentType: e.employmentType,
+          employmentStatus: e.employmentStatus,
+          hireDate: toDateOnly(e.hireDate),
+          regularizationDate: toDateOnly(e.regularizationDate),
+          separationDate: toDateOnly(e.separationDate),
+        },
+      })
+      employeeProfileId = profile.id
+    } else {
+      const profile = await tx.employeeProfile.findUnique({
+        where: { workspaceMemberId: data.memberId },
+      })
+      employeeProfileId = profile?.id ?? null
+    }
+
+    if (data.governmentIds) {
+      if (!employeeProfileId) {
+        const profile = await tx.employeeProfile.create({
+          data: { workspaceMemberId: data.memberId },
+        })
+        employeeProfileId = profile.id
+      }
+
+      const g = data.governmentIds
+      await tx.employeeGovernmentId.upsert({
+        where: { employeeProfileId },
+        create: {
+          employeeProfileId,
+          sssNumber: emptyToNull(g.sssNumber),
+          philHealthNumber: emptyToNull(g.philHealthNumber),
+          tinNumber: emptyToNull(g.tinNumber),
+          pagIbigNumber: emptyToNull(g.pagIbigNumber),
+        },
+        update: {
+          sssNumber: emptyToNull(g.sssNumber),
+          philHealthNumber: emptyToNull(g.philHealthNumber),
+          tinNumber: emptyToNull(g.tinNumber),
+          pagIbigNumber: emptyToNull(g.pagIbigNumber),
+        },
+      })
+    }
   })
 }
 
@@ -731,7 +1162,10 @@ const updateProfileSchema = z.object({
   lastName: z.string().trim().min(1).max(50),
   contactNumber: z.string().trim().max(50).optional().or(z.literal('')),
   birthDate: z.string().date().optional().or(z.literal('')),
-  gender: z.enum(['MALE', 'FEMALE', 'NON_BINARY', 'PREFER_NOT_TO_SAY']).optional().or(z.literal('')),
+  gender: z
+    .enum(['MALE', 'FEMALE', 'NON_BINARY', 'PREFER_NOT_TO_SAY'])
+    .optional()
+    .or(z.literal('')),
   maritalStatus: z
     .enum(['SINGLE', 'MARRIED', 'SEPARATED', 'WIDOWED', 'DIVORCED'])
     .optional()
@@ -749,10 +1183,8 @@ export async function updateProfile(data: z.infer<typeof updateProfileSchema>) {
   const access = await requireWorkspaceAccess()
 
   const birthDate = data.birthDate ? new Date(data.birthDate) : null
-  const gender = data.gender ? (data.gender as 'MALE' | 'FEMALE' | 'NON_BINARY' | 'PREFER_NOT_TO_SAY') : null
-  const maritalStatus = data.maritalStatus
-    ? (data.maritalStatus as 'SINGLE' | 'MARRIED' | 'SEPARATED' | 'WIDOWED' | 'DIVORCED')
-    : null
+  const gender = data.gender || null
+  const maritalStatus = data.maritalStatus ? data.maritalStatus : null
 
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
@@ -809,6 +1241,49 @@ export async function updateProfile(data: z.infer<typeof updateProfileSchema>) {
   })
 }
 
+export async function getSelfProfile() {
+  const access = await requireWorkspaceAccess()
+  const user = await prisma.user.findUnique({
+    where: { id: access.user.id },
+    include: {
+      profile: {
+        include: { address: true },
+      },
+    },
+  })
+
+  const profile = user?.profile
+  return {
+    user: {
+      id: user?.id ?? access.user.id,
+      name: user?.name ?? access.user.name,
+      email: user?.email ?? access.user.email,
+      image: user?.image ?? null,
+    },
+    profile: profile
+      ? {
+          firstName: profile.firstName,
+          middleName: profile.middleName ?? '',
+          lastName: profile.lastName,
+          contactNumber: profile.contactNumber ?? '',
+          birthDate: fromDateOnly(profile.birthDate),
+          gender: profile.gender ?? '',
+          maritalStatus: profile.maritalStatus ?? '',
+        }
+      : null,
+    address: profile?.address
+      ? {
+          buildingNo: profile.address.buildingNo ?? '',
+          street: profile.address.street ?? '',
+          city: profile.address.city ?? '',
+          province: profile.address.province ?? '',
+          postalCode: profile.address.postalCode ?? '',
+          country: profile.address.country,
+        }
+      : null,
+  }
+}
+
 // ─── Workspace settings ───────────────────────────────────────────────────────
 
 const updateWorkspaceSettingsSchema = z.object({
@@ -816,7 +1291,9 @@ const updateWorkspaceSettingsSchema = z.object({
   timezone: z.string().trim().min(1).max(80),
 })
 
-export async function updateWorkspaceSettings(data: z.infer<typeof updateWorkspaceSettingsSchema>) {
+export async function updateWorkspaceSettings(
+  data: z.infer<typeof updateWorkspaceSettingsSchema>,
+) {
   const access = await requireWorkspaceAccess()
 
   const level = access.member.workspaceRole?.permissionLevel
@@ -851,7 +1328,9 @@ export async function getMemberAnalytics(): Promise<MemberStat[]> {
   const weekStart = new Date(now)
   weekStart.setHours(0, 0, 0, 0)
   const dayOfWeek = weekStart.getDay()
-  weekStart.setDate(weekStart.getDate() + (dayOfWeek === 0 ? -6 : 1 - dayOfWeek))
+  weekStart.setDate(
+    weekStart.getDate() + (dayOfWeek === 0 ? -6 : 1 - dayOfWeek),
+  )
 
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
@@ -866,9 +1345,13 @@ export async function getMemberAnalytics(): Promise<MemberStat[]> {
     },
   })
 
-  const statsMap: Record<
-    string,
-    Omit<MemberStat, 'topProjects'> & { projectSeconds: Record<string, number> }
+  const statsMap: Partial<
+    Record<
+      string,
+      Omit<MemberStat, 'topProjects'> & {
+        projectSeconds: Record<string, number>
+      }
+    >
   > = {}
 
   for (const entry of entries) {
@@ -898,13 +1381,15 @@ export async function getMemberAnalytics(): Promise<MemberStat[]> {
     }
   }
 
-  return Object.values(statsMap).map(({ projectSeconds, ...rest }) => ({
-    ...rest,
-    topProjects: Object.entries(projectSeconds)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([projectId, seconds]) => ({ projectId, seconds })),
-  }))
+  return Object.values(statsMap)
+    .filter((stat): stat is NonNullable<typeof stat> => Boolean(stat))
+    .map(({ projectSeconds, ...rest }) => ({
+      ...rest,
+      topProjects: Object.entries(projectSeconds)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([projectId, seconds]) => ({ projectId, seconds })),
+    }))
 }
 
 export const trackerSchemas = {

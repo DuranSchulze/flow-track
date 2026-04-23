@@ -4,14 +4,33 @@ export const getWorkspaceAccessFn = createServerFn({ method: 'GET' })
   .inputValidator((input: { slug?: string } | undefined) => input ?? {})
   .handler(async ({ data }) => {
     const { requireWorkspaceAccess } = await import('./workspace-access.server')
-    return requireWorkspaceAccess(data.slug ?? null)
+    const access = await requireWorkspaceAccess(data.slug ?? null)
+    return {
+      workspace: {
+        id: access.workspace.id,
+        name: access.workspace.name,
+        slug: access.workspace.slug,
+        timezone: access.workspace.timezone,
+        defaultBillableRate: Number(access.workspace.defaultBillableRate),
+        billableCurrency: access.workspace.billableCurrency,
+      },
+      user: {
+        id: access.user.id,
+        name: access.user.name,
+        email: access.user.email,
+      },
+      member: {
+        id: access.member.id,
+        permissionLevel:
+          access.member.workspaceRole?.permissionLevel ?? 'EMPLOYEE',
+      },
+    }
   })
 
 export const listUserWorkspacesFn = createServerFn({ method: 'GET' }).handler(
   async () => {
-    const { getAuthSession, listUserWorkspaces } = await import(
-      './workspace-access.server'
-    )
+    const { getAuthSession, listUserWorkspaces } =
+      await import('./workspace-access.server')
     const session = await getAuthSession()
     if (!session?.user) return []
     const members = await listUserWorkspaces(
@@ -37,9 +56,8 @@ export const listUserWorkspacesFn = createServerFn({ method: 'GET' }).handler(
 export const setActiveWorkspaceFn = createServerFn({ method: 'POST' })
   .inputValidator((input: { slug: string }) => input)
   .handler(async ({ data }) => {
-    const { requireWorkspaceAccess, setActiveWorkspaceCookie } = await import(
-      './workspace-access.server'
-    )
+    const { requireWorkspaceAccess, setActiveWorkspaceCookie } =
+      await import('./workspace-access.server')
     const access = await requireWorkspaceAccess(data.slug)
     setActiveWorkspaceCookie(access.workspace.slug)
     return { slug: access.workspace.slug }

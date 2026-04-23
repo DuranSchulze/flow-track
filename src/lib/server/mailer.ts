@@ -19,7 +19,7 @@ function getTransport(): Transporter | null {
   const port = Number(process.env.SMTP_PORT ?? 587)
   const secure = String(process.env.SMTP_SECURE ?? 'false') === 'true'
   const user = process.env.SMTP_USER
-  const pass = process.env.SMTP_PASSWORD
+  const pass = process.env.SMTP_PASSWORD ?? process.env.SMTP_PASS
 
   cachedTransport = nodemailer.createTransport({
     host,
@@ -32,7 +32,11 @@ function getTransport(): Transporter | null {
 }
 
 function getFromAddress(): string {
-  return process.env.EMAIL_FROM ?? 'Flow Track <no-reply@localhost>'
+  return (
+    process.env.EMAIL_FROM ??
+    process.env.SMTP_FROM ??
+    'Flow Track <no-reply@localhost>'
+  )
 }
 
 /**
