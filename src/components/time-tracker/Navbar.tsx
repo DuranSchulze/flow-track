@@ -108,10 +108,10 @@ export function Navbar({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="icon"
                 title="Account & appearance"
-                className="rounded-full border border-transparent text-muted-foreground hover:border-border hover:bg-card hover:text-foreground"
+                className="rounded-full bg-card/80 text-muted-foreground hover:text-foreground"
               >
                 <UserCircle className="h-4 w-4" />
               </Button>

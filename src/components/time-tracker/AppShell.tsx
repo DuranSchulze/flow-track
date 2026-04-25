@@ -23,6 +23,7 @@ export function AppShell({
   const pathname = useRouterState({ select: (s) => s.location.pathname })
 
   const timerActive = pathname.startsWith('/app/time-tracker')
+  const analyticsActive = pathname.startsWith('/app/analytics')
   const settingsActive = pathname.startsWith('/app/workspace')
 
   const [settingsOpen, setSettingsOpen] = useState(settingsActive)
@@ -39,6 +40,7 @@ export function AppShell({
           workspaceName={workspace.name}
           userEmail={user.email}
           timerActive={timerActive}
+          analyticsActive={analyticsActive}
           settingsActive={settingsActive}
           settingsOpen={settingsOpen}
           onToggleSettings={() => setSettingsOpen((open) => !open)}

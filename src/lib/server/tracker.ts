@@ -39,6 +39,12 @@ const updateEntrySchema = entryInputSchema.extend({
   id: z.string().min(1),
 })
 
+const analyticsRangeSchema = z.object({
+  startDate: z.string().date(),
+  endDate: z.string().date(),
+  scope: z.enum(['personal', 'organization', 'department']).optional(),
+})
+
 export const getTrackerStateFn = createServerFn({ method: 'GET' }).handler(
   async () => {
     const { getTrackerState } = await import('./tracker.server')
@@ -52,6 +58,13 @@ export const getMemberAnalyticsFn = createServerFn({ method: 'GET' }).handler(
     return getMemberAnalytics()
   },
 )
+
+export const getAnalyticsFn = createServerFn({ method: 'GET' })
+  .inputValidator((input) => analyticsRangeSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { getAnalytics } = await import('./tracker.server')
+    return getAnalytics(data)
+  })
 
 export const startTimerFn = createServerFn({ method: 'POST' })
   .inputValidator((input) => startTimerSchema.parse(input))
@@ -220,11 +233,13 @@ export const deleteDepartmentFn = createServerFn({ method: 'POST' })
 
 const createCohortSchema = z.object({
   name: z.string().trim().min(1).max(120),
+  departmentId: z.string().min(1),
 })
 
 const updateCohortSchema = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1).max(120),
+  departmentId: z.string().min(1),
 })
 
 export const createCohortFn = createServerFn({ method: 'POST' })

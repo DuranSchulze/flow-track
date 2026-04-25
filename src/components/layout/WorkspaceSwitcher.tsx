@@ -1,11 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import {
-  BriefcaseBusiness,
-  Check,
-  ChevronDown,
-  Plus,
-} from 'lucide-react'
+import { BriefcaseBusiness, Check, ChevronDown, Plus } from 'lucide-react'
 import { gooeyToast } from 'goey-toast'
 import { Button } from '#/components/ui/button'
 import {
@@ -48,12 +43,13 @@ export function WorkspaceSwitcher({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
-          className="hidden items-center gap-2 text-foreground sm:inline-flex"
+          title="Switch workspace"
+          className="hidden max-w-[260px] items-center gap-2 bg-card/80 text-foreground sm:inline-flex"
         >
           <BriefcaseBusiness className="h-4 w-4 text-muted-foreground" />
-          <span className="font-semibold">{currentWorkspaceName}</span>
+          <span className="truncate font-semibold">{currentWorkspaceName}</span>
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
@@ -80,10 +76,7 @@ export function WorkspaceSwitcher({
               <div className="flex-1 min-w-0">
                 <p className="m-0 truncate text-sm font-semibold">{ws.name}</p>
                 {ws.role && (
-                  <p
-                    className="m-0 text-xs"
-                    style={{ color: ws.role.color }}
-                  >
+                  <p className="m-0 text-xs" style={{ color: ws.role.color }}>
                     {ws.role.name}
                   </p>
                 )}

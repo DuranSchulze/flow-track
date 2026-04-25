@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 import { Link } from '@tanstack/react-router'
 import {
+  BarChart3,
   BriefcaseBusiness,
   ChevronDown,
   Cog,
@@ -22,6 +23,7 @@ export function AppSidebar({
   workspaceName,
   userEmail,
   timerActive,
+  analyticsActive,
   settingsActive,
   settingsOpen,
   onToggleSettings,
@@ -32,6 +34,7 @@ export function AppSidebar({
   workspaceName: string
   userEmail: string
   timerActive: boolean
+  analyticsActive: boolean
   settingsActive: boolean
   settingsOpen: boolean
   onToggleSettings: () => void
@@ -78,6 +81,21 @@ export function AppSidebar({
           >
             <Timer className="h-4 w-4 shrink-0" />
             {!collapsed && <span>Timer</span>}
+          </Link>
+
+          <Link
+            to="/app/analytics"
+            title="Analytics"
+            className={`flex h-10 w-full items-center ${
+              collapsed ? 'justify-center' : 'gap-3 px-3'
+            } text-sm font-semibold transition-colors ${
+              analyticsActive
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+            }`}
+          >
+            <BarChart3 className="h-4 w-4 shrink-0" />
+            {!collapsed && <span>Analytics</span>}
           </Link>
 
           {collapsed ? (

@@ -8,6 +8,8 @@ export type Workspace = {
   timezone: string
   defaultBillableRate: number
   billableCurrency: string
+  googleSheetUrl: string | null
+  googleSheetSyncedAt: string | null
 }
 
 export type WorkspaceRole = {
@@ -25,6 +27,7 @@ export type Department = {
 export type Cohort = {
   id: string
   name: string
+  departmentId: string
 }
 
 export type Project = {

@@ -19,6 +19,7 @@ import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as AuthResetPasswordRouteImport } from './routes/auth/reset-password'
 import { Route as AuthForgotPasswordRouteImport } from './routes/auth/forgot-password'
 import { Route as AppProfileRouteImport } from './routes/app/profile'
+import { Route as AppAnalyticsRouteImport } from './routes/app/analytics'
 import { Route as AppTimeTrackerIndexRouteImport } from './routes/app/time-tracker/index'
 import { Route as AppWorkspaceSettingsRouteImport } from './routes/app/workspace/settings'
 import { Route as AppWorkspaceMembersRouteImport } from './routes/app/workspace/members'
@@ -79,6 +80,11 @@ const AppProfileRoute = AppProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAnalyticsRoute = AppAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppTimeTrackerIndexRoute = AppTimeTrackerIndexRouteImport.update({
   id: '/time-tracker/',
   path: '/time-tracker/',
@@ -132,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/demo-payment': typeof DemoPaymentRoute
   '/lounge': typeof LoungeRoute
   '/onboarding': typeof OnboardingRoute
+  '/app/analytics': typeof AppAnalyticsRoute
   '/app/profile': typeof AppProfileRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
@@ -153,6 +160,7 @@ export interface FileRoutesByTo {
   '/demo-payment': typeof DemoPaymentRoute
   '/lounge': typeof LoungeRoute
   '/onboarding': typeof OnboardingRoute
+  '/app/analytics': typeof AppAnalyticsRoute
   '/app/profile': typeof AppProfileRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
@@ -175,6 +183,7 @@ export interface FileRoutesById {
   '/demo-payment': typeof DemoPaymentRoute
   '/lounge': typeof LoungeRoute
   '/onboarding': typeof OnboardingRoute
+  '/app/analytics': typeof AppAnalyticsRoute
   '/app/profile': typeof AppProfileRoute
   '/auth/forgot-password': typeof AuthForgotPasswordRoute
   '/auth/reset-password': typeof AuthResetPasswordRoute
@@ -198,6 +207,7 @@ export interface FileRouteTypes {
     | '/demo-payment'
     | '/lounge'
     | '/onboarding'
+    | '/app/analytics'
     | '/app/profile'
     | '/auth/forgot-password'
     | '/auth/reset-password'
@@ -219,6 +229,7 @@ export interface FileRouteTypes {
     | '/demo-payment'
     | '/lounge'
     | '/onboarding'
+    | '/app/analytics'
     | '/app/profile'
     | '/auth/forgot-password'
     | '/auth/reset-password'
@@ -240,6 +251,7 @@ export interface FileRouteTypes {
     | '/demo-payment'
     | '/lounge'
     | '/onboarding'
+    | '/app/analytics'
     | '/app/profile'
     | '/auth/forgot-password'
     | '/auth/reset-password'
@@ -341,6 +353,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProfileRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/analytics': {
+      id: '/app/analytics'
+      path: '/analytics'
+      fullPath: '/app/analytics'
+      preLoaderRoute: typeof AppAnalyticsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/time-tracker/': {
       id: '/app/time-tracker/'
       path: '/time-tracker'
@@ -419,6 +438,7 @@ const AppWorkspaceMembersRouteWithChildren =
   AppWorkspaceMembersRoute._addFileChildren(AppWorkspaceMembersRouteChildren)
 
 interface AppRouteChildren {
+  AppAnalyticsRoute: typeof AppAnalyticsRoute
   AppProfileRoute: typeof AppProfileRoute
   AppTimeTrackerDayRoute: typeof AppTimeTrackerDayRoute
   AppTimeTrackerMonthRoute: typeof AppTimeTrackerMonthRoute
@@ -430,6 +450,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAnalyticsRoute: AppAnalyticsRoute,
   AppProfileRoute: AppProfileRoute,
   AppTimeTrackerDayRoute: AppTimeTrackerDayRoute,
   AppTimeTrackerMonthRoute: AppTimeTrackerMonthRoute,

@@ -618,6 +618,7 @@ export function MembersScreen({
   const [search, setSearch] = useState('')
   const [filterRole, setFilterRole] = useState('')
   const [filterDept, setFilterDept] = useState('')
+  const [filterCohort, setFilterCohort] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [page, setPage] = useState(0)
 
@@ -645,10 +646,26 @@ export function MembersScreen({
       }
       if (filterRole && m.workspaceRoleId !== filterRole) return false
       if (filterDept && m.departmentId !== filterDept) return false
+      if (filterCohort && !m.cohortIds.includes(filterCohort)) return false
       if (filterStatus && m.status !== filterStatus) return false
       return true
     })
-  }, [state.members, search, filterRole, filterDept, filterStatus])
+  }, [
+    state.members,
+    search,
+    filterRole,
+    filterDept,
+    filterCohort,
+    filterStatus,
+  ])
+
+  const cohortFilterOptions = useMemo(
+    () =>
+      state.cohorts.filter(
+        (cohort) => !filterDept || cohort.departmentId === filterDept,
+      ),
+    [state.cohorts, filterDept],
+  )
 
   const totalPages = Math.ceil(filteredMembers.length / PAGE_SIZE)
   const pagedMembers = useMemo(
@@ -660,7 +677,8 @@ export function MembersScreen({
     setPage(0)
   }
 
-  const hasActiveFilters = search || filterRole || filterDept || filterStatus
+  const hasActiveFilters =
+    search || filterRole || filterDept || filterCohort || filterStatus
 
   return (
     <Page title="Workspace members" eyebrow="Owner/Admin">
@@ -742,7 +760,19 @@ export function MembersScreen({
           <select
             value={filterDept}
             onChange={(e) => {
-              setFilterDept(e.target.value)
+              const nextDepartmentId = e.target.value
+              setFilterDept(nextDepartmentId)
+              if (
+                filterCohort &&
+                !state.cohorts.some(
+                  (cohort) =>
+                    cohort.id === filterCohort &&
+                    (!nextDepartmentId ||
+                      cohort.departmentId === nextDepartmentId),
+                )
+              ) {
+                setFilterCohort('')
+              }
               resetPage()
             }}
             className="h-9 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-primary"
@@ -751,6 +781,21 @@ export function MembersScreen({
             {state.departments.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filterCohort}
+            onChange={(e) => {
+              setFilterCohort(e.target.value)
+              resetPage()
+            }}
+            className="h-9 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-primary"
+          >
+            <option value="">All cohorts</option>
+            {cohortFilterOptions.map((cohort) => (
+              <option key={cohort.id} value={cohort.id}>
+                {cohort.name}
               </option>
             ))}
           </select>
@@ -774,6 +819,7 @@ export function MembersScreen({
                 setSearch('')
                 setFilterRole('')
                 setFilterDept('')
+                setFilterCohort('')
                 setFilterStatus('')
                 resetPage()
               }}
@@ -1342,14 +1388,27 @@ function CohortsManager({
   const router = useRouter()
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
+  const [departmentId, setDepartmentId] = useState(
+    state.departments[0]?.id ?? '',
+  )
+  const [filterDepartmentId, setFilterDepartmentId] = useState('')
   const [pending, setPending] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
+  const visibleCohorts = state.cohorts.filter(
+    (cohort) =>
+      !filterDepartmentId || cohort.departmentId === filterDepartmentId,
+  )
+
   async function handleCreate(event: React.FormEvent) {
     event.preventDefault()
+    if (!departmentId) {
+      gooeyToast.error('Select a department first')
+      return
+    }
     setPending(true)
     try {
-      await createCohortFn({ data: { name } })
+      await createCohortFn({ data: { name, departmentId } })
       await router.invalidate()
       gooeyToast.success('Cohort created')
       setName('')
@@ -1399,45 +1458,83 @@ function CohortsManager({
       }
     >
       {showForm && (
-        <form onSubmit={handleCreate} className="mt-4 flex gap-2">
+        <form onSubmit={handleCreate} className="mt-4 grid gap-2">
+          <select
+            value={departmentId}
+            onChange={(e) => setDepartmentId(e.target.value)}
+            required
+            className="h-9 rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-primary"
+          >
+            <option value="">Choose department</option>
+            {state.departments.map((department) => (
+              <option key={department.id} value={department.id}>
+                {department.name}
+              </option>
+            ))}
+          </select>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Cohort name"
             required
-            className="h-9 flex-1 rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary"
+            className="h-9 rounded-lg border border-border bg-card text-foreground px-3 text-sm outline-none focus:border-primary"
           />
           <button
             type="submit"
             disabled={pending}
             className="h-9 rounded-lg bg-primary px-3 text-sm font-bold text-primary-foreground hover:brightness-110 disabled:bg-muted disabled:text-muted-foreground"
           >
-            {pending ? '…' : 'Add'}
+            {pending ? 'Creating…' : 'Create cohort'}
           </button>
         </form>
       )}
+      <div className="mt-4">
+        <select
+          value={filterDepartmentId}
+          onChange={(e) => setFilterDepartmentId(e.target.value)}
+          className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground outline-none focus:border-primary"
+        >
+          <option value="">All departments</option>
+          {state.departments.map((department) => (
+            <option key={department.id} value={department.id}>
+              {department.name}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="mt-4 flex flex-col gap-2">
-        {state.cohorts.map((cohort) => (
-          <div
-            key={cohort.id}
-            className="group flex items-center justify-between rounded-lg border border-border px-3 py-2"
-          >
-            <span className="text-sm font-semibold text-foreground">
-              {cohort.name}
-            </span>
-            {canManage && (
-              <IconBtn
-                onClick={() => handleDelete(cohort.id, cohort.name)}
-                title="Delete cohort"
-                variant="danger"
-              >
-                <Trash2
-                  className={`h-3.5 w-3.5 opacity-0 group-hover:opacity-100 ${deletingId === cohort.id ? 'opacity-100' : ''}`}
-                />
-              </IconBtn>
-            )}
-          </div>
-        ))}
+        {visibleCohorts.map((cohort) => {
+          const department = state.departments.find(
+            (dept) => dept.id === cohort.departmentId,
+          )
+
+          return (
+            <div
+              key={cohort.id}
+              className="group flex items-center justify-between rounded-lg border border-border px-3 py-2"
+            >
+              <div>
+                <p className="m-0 text-sm font-semibold text-foreground">
+                  {cohort.name}
+                </p>
+                <p className="m-0 mt-0.5 text-xs text-muted-foreground">
+                  {department?.name ?? 'Unassigned department'}
+                </p>
+              </div>
+              {canManage && (
+                <IconBtn
+                  onClick={() => handleDelete(cohort.id, cohort.name)}
+                  title="Delete cohort"
+                  variant="danger"
+                >
+                  <Trash2
+                    className={`h-3.5 w-3.5 opacity-0 group-hover:opacity-100 ${deletingId === cohort.id ? 'opacity-100' : ''}`}
+                  />
+                </IconBtn>
+              )}
+            </div>
+          )
+        })}
       </div>
     </SectionCard>
   )

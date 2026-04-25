@@ -182,22 +182,25 @@ model Verification {
 }
 
 model Workspace {
-  id          String             @id @default(cuid()) @db.VarChar(30)
-  name        String             @db.VarChar(150)
-  slug        String             @unique @db.VarChar(120)
-  timezone    String             @default("Asia/Manila") @db.VarChar(80)
-  defaultBillableRate Decimal    @default(0) @map("default_billable_rate") @db.Decimal(12, 2)
-  billableCurrency    String     @default("PHP") @map("billable_currency") @db.VarChar(8)
-  createdAt   DateTime           @default(now()) @map("created_at")
-  updatedAt   DateTime           @updatedAt @map("updated_at")
-  members     WorkspaceMember[]
-  roles       WorkspaceRole[]
-  departments Department[]
-  cohorts     Cohort[]
-  projects    Project[]
-  tags        Tag[]
-  timeEntries TimeEntry[]
-  invites     WorkspaceInvite[]
+  id                  String            @id @default(cuid()) @db.VarChar(30)
+  name                String            @db.VarChar(150)
+  slug                String            @unique @db.VarChar(120)
+  timezone            String            @default("Asia/Manila") @db.VarChar(80)
+  defaultBillableRate Decimal           @default(0) @map("default_billable_rate") @db.Decimal(12, 2)
+  billableCurrency    String            @default("PHP") @map("billable_currency") @db.VarChar(8)
+  googleSheetUrl      String?           @map("google_sheet_url") @db.VarChar(500)
+  googleSheetSyncedAt DateTime?         @map("google_sheet_synced_at")
+  googleSheetSyncedBy String?           @map("google_sheet_synced_by") @db.VarChar(30)
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+  members             WorkspaceMember[]
+  roles               WorkspaceRole[]
+  departments         Department[]
+  cohorts             Cohort[]
+  projects            Project[]
+  tags                Tag[]
+  timeEntries         TimeEntry[]
+  invites             WorkspaceInvite[]
 
   @@map("workspaces")
 }
@@ -286,6 +289,7 @@ model Department {
   headMemberId String?           @map("head_member_id") @db.VarChar(30)
   head         WorkspaceMember?  @relation("DepartmentHead", fields: [headMemberId], references: [id], onDelete: SetNull)
   members      WorkspaceMember[] @relation("DepartmentMembers")
+  cohorts      Cohort[]
   invites      WorkspaceInvite[]
   createdAt    DateTime          @default(now()) @map("created_at")
   updatedAt    DateTime          @updatedAt @map("updated_at")
@@ -296,15 +300,18 @@ model Department {
 }
 
 model Cohort {
-  id          String         @id @default(cuid()) @db.VarChar(30)
-  workspaceId String         @map("workspace_id") @db.VarChar(30)
-  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name        String         @db.VarChar(120)
-  members     CohortMember[]
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
+  id           String         @id @default(cuid()) @db.VarChar(30)
+  workspaceId  String         @map("workspace_id") @db.VarChar(30)
+  workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  departmentId String?        @map("department_id") @db.VarChar(30)
+  department   Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  name         String         @db.VarChar(120)
+  members      CohortMember[]
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
 
-  @@unique([workspaceId, name])
+  @@unique([workspaceId, departmentId, name])
+  @@index([departmentId])
   @@map("cohorts")
 }
 

@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { TimeTrackerDashboard } from '#/components/time-tracker/TimeTrackerDashboard'
+import { TimeTrackerDashboard } from '#/components/time-tracker/dashboard/TimeTrackerDashboard'
 import { getTrackerStateFn } from '#/lib/server/tracker'
 import type { ViewMode } from '#/lib/time-tracker/types'
 

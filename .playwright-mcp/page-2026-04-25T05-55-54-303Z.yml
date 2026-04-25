@@ -1,0 +1,53 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - button "Switch to dark mode" [ref=e4]:
+      - img [ref=e5]
+    - generic [ref=e7]:
+      - complementary [ref=e8]:
+        - generic [ref=e10]:
+          - link "Clockify Timer" [ref=e11] [cursor=pointer]:
+            - /url: /
+            - generic [ref=e12]: Clockify Timer
+          - generic [ref=e13]:
+            - paragraph [ref=e14]: Internal time tracking
+            - heading "Track every hour, every project, every team." [level=2] [ref=e15]:
+              - text: Track every hour, every project,
+              - text: every team.
+            - paragraph [ref=e16]: A private workspace for live timers, manual entries, and clean reporting. Built for teams who care about their time.
+            - list [ref=e17]:
+              - listitem [ref=e18]:
+                - img [ref=e20]
+                - generic [ref=e23]: One active timer per member
+              - listitem [ref=e24]:
+                - img [ref=e26]
+                - generic [ref=e31]: Departments, projects and tags
+              - listitem [ref=e32]:
+                - img [ref=e34]
+                - generic [ref=e36]: Day, week, and month totals
+          - paragraph [ref=e37]: © 2026 Flow Track — internal workspace.
+      - generic [ref=e40]:
+        - heading "Welcome back" [level=1] [ref=e41]
+        - paragraph [ref=e42]: Sign in to your workspace. Access is managed by your Owner or Admin.
+        - tablist "Authentication mode" [ref=e43]:
+          - tab "Sign in" [selected] [ref=e44]
+          - tab "Sign up" [ref=e45]
+        - generic [ref=e46]:
+          - generic [ref=e47]:
+            - text: Email
+            - textbox "Email" [ref=e48]
+          - generic [ref=e49]:
+            - generic [ref=e50]:
+              - generic [ref=e51]: Password
+              - link "Forgot password?" [ref=e52] [cursor=pointer]:
+                - /url: /auth/forgot-password
+            - generic [ref=e53]:
+              - textbox "Password" [ref=e54]
+              - button "Show password" [ref=e55]:
+                - img [ref=e56]
+          - button "Sign in" [ref=e59]
+    - button "Dev logins" [ref=e61]:
+      - img [ref=e62]
+      - text: Dev logins
+  - region "Notifications alt+T"
+  - status [ref=e65]
+  - alert [ref=e66]

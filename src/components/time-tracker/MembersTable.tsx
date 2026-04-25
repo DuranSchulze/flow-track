@@ -313,6 +313,9 @@ function MemberRow({
   const [pending, setPending] = useState(false)
   const rateInput = rate.trim()
   const parsedRate = rateInput === '' ? null : Number(rateInput)
+  const assignableCohorts = state.cohorts.filter(
+    (cohort) => deptId && cohort.departmentId === deptId,
+  )
   const rateInputInvalid =
     parsedRate !== null && (!Number.isFinite(parsedRate) || parsedRate < 0)
 
@@ -415,7 +418,19 @@ function MemberRow({
         <TableCell className="px-5 py-4 align-top">
           <select
             value={deptId}
-            onChange={(e) => setDeptId(e.target.value)}
+            onChange={(e) => {
+              const nextDepartmentId = e.target.value
+              setDeptId(nextDepartmentId)
+              setCohortIds((current) =>
+                current.filter((cohortId) =>
+                  state.cohorts.some(
+                    (cohort) =>
+                      cohort.id === cohortId &&
+                      cohort.departmentId === nextDepartmentId,
+                  ),
+                ),
+              )
+            }}
             className="h-8 w-full min-w-[140px] rounded border border-border bg-card px-2 text-xs text-foreground outline-none focus:border-primary"
           >
             <option value="">Unassigned</option>
@@ -428,7 +443,12 @@ function MemberRow({
         </TableCell>
         <TableCell className="px-5 py-4 align-top">
           <div className="flex min-w-[200px] flex-wrap gap-1.5">
-            {state.cohorts.map((c) => (
+            {assignableCohorts.length === 0 && (
+              <span className="text-xs text-muted-foreground">
+                {deptId ? 'No cohorts in this department' : 'Select department'}
+              </span>
+            )}
+            {assignableCohorts.map((c) => (
               <label
                 key={c.id}
                 className="flex cursor-pointer items-center gap-1 whitespace-nowrap text-xs text-foreground"

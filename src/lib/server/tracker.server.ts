@@ -35,6 +35,56 @@ const updateEntrySchema = entryInputSchema.extend({
   id: z.string().min(1),
 })
 
+const analyticsRangeSchema = z.object({
+  startDate: z.string().date(),
+  endDate: z.string().date(),
+  scope: z.enum(['personal', 'organization', 'department']).optional(),
+})
+
+export type AnalyticsScope = 'workspace' | 'department' | 'personal'
+export type AnalyticsSelectedScope = 'personal' | 'organization' | 'department'
+
+export type AnalyticsPayload = {
+  scope: AnalyticsScope
+  selectedScope: AnalyticsSelectedScope
+  availableScopes: AnalyticsSelectedScope[]
+  scopeLabel: string
+  notice: string | null
+  startDate: string
+  endDate: string
+  summary: {
+    totalSeconds: number
+    billableSeconds: number
+    nonBillableSeconds: number
+    entryCount: number
+    activeMembers: number | null
+  }
+  dailyTotals: Array<{ date: string; seconds: number }>
+  projectTotals: Array<{
+    projectId: string
+    name: string
+    color: string
+    seconds: number
+  }>
+  billableSplit: Array<{ label: 'Billable' | 'Non-billable'; seconds: number }>
+  heatmap: Array<{ date: string; seconds: number; intensity: number }>
+  topTasks: Array<{ description: string; seconds: number; entryCount: number }>
+  topTags: Array<{
+    tagId: string
+    name: string
+    color: string
+    seconds: number
+    entryCount: number
+  }>
+  topDepartments: Array<{
+    departmentId: string
+    name: string
+    color: string
+    seconds: number
+    memberCount: number
+  }>
+}
+
 function toIso(date: Date | string | null) {
   if (!date) {
     return null
@@ -89,6 +139,62 @@ function calculateDuration(startedAt: Date, endedAt: Date | null) {
     0,
     Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000),
   )
+}
+
+function parseDateOnly(value: string) {
+  return new Date(`${value}T00:00:00.000Z`)
+}
+
+function toDateKey(date: Date) {
+  return date.toISOString().slice(0, 10)
+}
+
+function addUtcDays(date: Date, days: number) {
+  const next = new Date(date)
+  next.setUTCDate(next.getUTCDate() + days)
+  return next
+}
+
+function getAnalyticsDateRange(data: z.infer<typeof analyticsRangeSchema>) {
+  const now = new Date()
+  const fallbackEnd = parseDateOnly(toDateKey(now))
+  const fallbackStart = addUtcDays(fallbackEnd, -29)
+  let start = parseDateOnly(data.startDate)
+  let end = parseDateOnly(data.endDate)
+
+  if (
+    Number.isNaN(start.getTime()) ||
+    Number.isNaN(end.getTime()) ||
+    start > end
+  ) {
+    start = fallbackStart
+    end = fallbackEnd
+  }
+
+  const maxStart = addUtcDays(end, -365)
+  if (start < maxStart) {
+    start = maxStart
+  }
+
+  return {
+    start,
+    end,
+    endExclusive: addUtcDays(end, 1),
+    startDate: toDateKey(start),
+    endDate: toDateKey(end),
+  }
+}
+
+function buildDateKeys(start: Date, end: Date) {
+  const keys: string[] = []
+  for (
+    let cursor = new Date(start);
+    cursor <= end;
+    cursor = addUtcDays(cursor, 1)
+  ) {
+    keys.push(toDateKey(cursor))
+  }
+  return keys
 }
 
 export async function getTrackerState(): Promise<TrackerState> {
@@ -152,6 +258,10 @@ export async function getTrackerState(): Promise<TrackerState> {
       timezone: access.workspace.timezone,
       defaultBillableRate: Number(access.workspace.defaultBillableRate),
       billableCurrency: access.workspace.billableCurrency,
+      googleSheetUrl: access.workspace.googleSheetUrl,
+      googleSheetSyncedAt: access.workspace.googleSheetSyncedAt
+        ? access.workspace.googleSheetSyncedAt.toISOString()
+        : null,
     },
     currentMemberId: memberId,
     roles: roles.map((role) => ({
@@ -167,6 +277,7 @@ export async function getTrackerState(): Promise<TrackerState> {
     cohorts: cohorts.map((cohort) => ({
       id: cohort.id,
       name: cohort.name,
+      departmentId: cohort.departmentId ?? '',
     })),
     projects: projects.map((project) => ({
       id: project.id,
@@ -651,27 +762,42 @@ export async function deleteDepartment(data: z.infer<typeof idSchema>) {
 
 const createCohortSchema = z.object({
   name: z.string().trim().min(1).max(120),
+  departmentId: z.string().min(1),
 })
 
 const updateCohortSchema = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1).max(120),
+  departmentId: z.string().min(1),
 })
 
 export async function createCohort(data: z.infer<typeof createCohortSchema>) {
   const access = await requireWorkspaceAccess()
   assertOwnerOrAdmin(access)
 
+  const department = await prisma.department.findFirst({
+    where: { id: data.departmentId, workspaceId: access.workspace.id },
+  })
+  if (!department) throw new Error('Selected department does not exist.')
+
   const existing = await prisma.cohort.findFirst({
     where: {
       workspaceId: access.workspace.id,
+      departmentId: data.departmentId,
       name: { equals: data.name, mode: 'insensitive' },
     },
   })
-  if (existing) throw new Error(`A cohort named "${data.name}" already exists.`)
+  if (existing)
+    throw new Error(
+      `A cohort named "${data.name}" already exists in ${department.name}.`,
+    )
 
   await prisma.cohort.create({
-    data: { workspaceId: access.workspace.id, name: data.name },
+    data: {
+      workspaceId: access.workspace.id,
+      departmentId: data.departmentId,
+      name: data.name,
+    },
   })
 }
 
@@ -679,9 +805,27 @@ export async function updateCohort(data: z.infer<typeof updateCohortSchema>) {
   const access = await requireWorkspaceAccess()
   assertOwnerOrAdmin(access)
 
+  const department = await prisma.department.findFirst({
+    where: { id: data.departmentId, workspaceId: access.workspace.id },
+  })
+  if (!department) throw new Error('Selected department does not exist.')
+
+  const duplicate = await prisma.cohort.findFirst({
+    where: {
+      id: { not: data.id },
+      workspaceId: access.workspace.id,
+      departmentId: data.departmentId,
+      name: { equals: data.name, mode: 'insensitive' },
+    },
+  })
+  if (duplicate)
+    throw new Error(
+      `A cohort named "${data.name}" already exists in ${department.name}.`,
+    )
+
   await prisma.cohort.updateMany({
     where: { id: data.id, workspaceId: access.workspace.id },
-    data: { name: data.name },
+    data: { name: data.name, departmentId: data.departmentId },
   })
 }
 
@@ -803,6 +947,35 @@ export async function updateWorkspaceMember(
       throw new Error('Selected role does not exist in this workspace.')
   }
 
+  const effectiveDepartmentId =
+    data.departmentId !== undefined ? data.departmentId : target.departmentId
+
+  if (effectiveDepartmentId) {
+    const departmentExists = await prisma.department.findFirst({
+      where: { id: effectiveDepartmentId, workspaceId: access.workspace.id },
+    })
+    if (!departmentExists)
+      throw new Error('Selected department does not exist in this workspace.')
+  }
+
+  if (data.cohortIds !== undefined && data.cohortIds.length > 0) {
+    if (!effectiveDepartmentId) {
+      throw new Error('Select a department before assigning cohorts.')
+    }
+
+    const validCohorts = await prisma.cohort.findMany({
+      where: {
+        id: { in: data.cohortIds },
+        workspaceId: access.workspace.id,
+        departmentId: effectiveDepartmentId,
+      },
+      select: { id: true },
+    })
+    if (validCohorts.length !== data.cohortIds.length) {
+      throw new Error('Selected cohorts must belong to the member department.')
+    }
+  }
+
   await prisma.$transaction(async (tx) => {
     await tx.workspaceMember.update({
       where: { id: data.memberId },
@@ -826,6 +999,8 @@ export async function updateWorkspaceMember(
           })),
         })
       }
+    } else if (data.departmentId !== undefined) {
+      await tx.cohortMember.deleteMany({ where: { memberId: data.memberId } })
     }
   })
 }
@@ -1307,6 +1482,254 @@ export async function updateWorkspaceSettings(
   })
 }
 
+// ─── Analytics dashboard ─────────────────────────────────────────────────────
+
+export async function getAnalytics(
+  data: z.infer<typeof analyticsRangeSchema>,
+): Promise<AnalyticsPayload> {
+  const access = await requireWorkspaceAccess()
+  const range = getAnalyticsDateRange(data)
+  const level = access.member.workspaceRole?.permissionLevel ?? 'EMPLOYEE'
+  const departmentId = access.member.departmentId
+  const defaultScope: AnalyticsSelectedScope =
+    level === 'OWNER' || level === 'ADMIN'
+      ? 'organization'
+      : level === 'MANAGER'
+        ? 'department'
+        : 'personal'
+  const requestedScope = data.scope ?? defaultScope
+  const availableScopes: AnalyticsSelectedScope[] =
+    level === 'OWNER' || level === 'ADMIN'
+      ? ['personal', 'organization']
+      : level === 'MANAGER'
+        ? ['personal', 'department']
+        : ['personal']
+
+  let scope: AnalyticsScope = 'personal'
+  let selectedScope: AnalyticsSelectedScope = 'personal'
+  let scopeLabel = 'Your time'
+  let notice: string | null = null
+  let memberWhere: {
+    workspaceId: string
+    status: 'ACTIVE'
+    departmentId?: string
+  } | null = null
+  const entryWhere: {
+    workspaceId: string
+    endedAt: { not: null }
+    startedAt: { gte: Date; lt: Date }
+    workspaceMemberId?: string
+    workspaceMember?: { departmentId: string }
+  } = {
+    workspaceId: access.workspace.id,
+    endedAt: { not: null },
+    startedAt: { gte: range.start, lt: range.endExclusive },
+  }
+
+  if (
+    (level === 'OWNER' || level === 'ADMIN') &&
+    requestedScope === 'organization'
+  ) {
+    scope = 'workspace'
+    selectedScope = 'organization'
+    scopeLabel = `${access.workspace.name} workspace`
+    memberWhere = { workspaceId: access.workspace.id, status: 'ACTIVE' }
+  } else if (
+    level === 'MANAGER' &&
+    requestedScope === 'department' &&
+    departmentId
+  ) {
+    const department = await prisma.department.findFirst({
+      where: { id: departmentId, workspaceId: access.workspace.id },
+      select: { name: true },
+    })
+    scope = 'department'
+    selectedScope = 'department'
+    scopeLabel = department?.name
+      ? `${department.name} department`
+      : 'Your department'
+    entryWhere.workspaceMember = { departmentId }
+    memberWhere = {
+      workspaceId: access.workspace.id,
+      status: 'ACTIVE',
+      departmentId,
+    }
+  } else {
+    entryWhere.workspaceMemberId = access.member.id
+    if (level === 'MANAGER' && requestedScope === 'department') {
+      notice =
+        'Managers need a department assignment to see department analytics. Showing your own time for now.'
+    }
+  }
+
+  const [entries, activeMembers] = await Promise.all([
+    prisma.timeEntry.findMany({
+      where: entryWhere,
+      select: {
+        description: true,
+        billable: true,
+        durationSeconds: true,
+        startedAt: true,
+        projectId: true,
+        project: { select: { id: true, name: true, color: true } },
+        tags: {
+          select: {
+            tag: { select: { id: true, name: true, color: true } },
+          },
+        },
+        workspaceMember: {
+          select: {
+            id: true,
+            department: { select: { id: true, name: true, color: true } },
+          },
+        },
+      },
+      orderBy: { startedAt: 'asc' },
+    }),
+    memberWhere ? prisma.workspaceMember.count({ where: memberWhere }) : null,
+  ])
+
+  const dateKeys = buildDateKeys(range.start, range.end)
+  const dailySeconds = new Map(dateKeys.map((date) => [date, 0]))
+  const projectSeconds = new Map<
+    string,
+    { projectId: string; name: string; color: string; seconds: number }
+  >()
+  const taskSeconds = new Map<
+    string,
+    { description: string; seconds: number; entryCount: number }
+  >()
+  const tagSeconds = new Map<
+    string,
+    {
+      tagId: string
+      name: string
+      color: string
+      seconds: number
+      entryCount: number
+    }
+  >()
+  const departmentSeconds = new Map<
+    string,
+    {
+      departmentId: string
+      name: string
+      color: string
+      seconds: number
+      memberIds: Set<string>
+    }
+  >()
+
+  let totalSeconds = 0
+  let billableSeconds = 0
+
+  for (const entry of entries) {
+    const seconds = Math.max(0, entry.durationSeconds)
+    totalSeconds += seconds
+    if (entry.billable) {
+      billableSeconds += seconds
+    }
+
+    const date = toDateKey(entry.startedAt)
+    dailySeconds.set(date, (dailySeconds.get(date) ?? 0) + seconds)
+
+    const projectId = entry.project?.id ?? entry.projectId ?? 'none'
+    const existingProject = projectSeconds.get(projectId)
+    projectSeconds.set(projectId, {
+      projectId,
+      name: entry.project?.name ?? 'No project',
+      color: entry.project?.color ?? '#94a3b8',
+      seconds: (existingProject?.seconds ?? 0) + seconds,
+    })
+
+    if (selectedScope === 'personal') {
+      const description = entry.description.trim() || 'Untitled task'
+      const task = taskSeconds.get(description)
+      taskSeconds.set(description, {
+        description,
+        seconds: (task?.seconds ?? 0) + seconds,
+        entryCount: (task?.entryCount ?? 0) + 1,
+      })
+    }
+
+    for (const entryTag of entry.tags) {
+      const tag = entryTag.tag
+      const existingTag = tagSeconds.get(tag.id)
+      tagSeconds.set(tag.id, {
+        tagId: tag.id,
+        name: tag.name,
+        color: tag.color,
+        seconds: (existingTag?.seconds ?? 0) + seconds,
+        entryCount: (existingTag?.entryCount ?? 0) + 1,
+      })
+    }
+
+    const department = entry.workspaceMember.department
+    const departmentKey = department?.id ?? 'unassigned'
+    const existingDepartment = departmentSeconds.get(departmentKey)
+    const memberIds = existingDepartment?.memberIds ?? new Set<string>()
+    memberIds.add(entry.workspaceMember.id)
+    departmentSeconds.set(departmentKey, {
+      departmentId: departmentKey,
+      name: department?.name ?? 'Unassigned',
+      color: department?.color ?? '#94a3b8',
+      seconds: (existingDepartment?.seconds ?? 0) + seconds,
+      memberIds,
+    })
+  }
+
+  const dailyTotals = dateKeys.map((date) => ({
+    date,
+    seconds: dailySeconds.get(date) ?? 0,
+  }))
+  const maxDailySeconds = Math.max(0, ...dailyTotals.map((day) => day.seconds))
+
+  return {
+    scope,
+    selectedScope,
+    availableScopes,
+    scopeLabel,
+    notice,
+    startDate: range.startDate,
+    endDate: range.endDate,
+    summary: {
+      totalSeconds,
+      billableSeconds,
+      nonBillableSeconds: totalSeconds - billableSeconds,
+      entryCount: entries.length,
+      activeMembers,
+    },
+    dailyTotals,
+    projectTotals: [...projectSeconds.values()].sort(
+      (a, b) => b.seconds - a.seconds,
+    ),
+    billableSplit: [
+      { label: 'Billable', seconds: billableSeconds },
+      { label: 'Non-billable', seconds: totalSeconds - billableSeconds },
+    ],
+    heatmap: dailyTotals.map((day) => ({
+      ...day,
+      intensity:
+        maxDailySeconds === 0
+          ? 0
+          : Math.max(1, Math.ceil((day.seconds / maxDailySeconds) * 4)),
+    })),
+    topTasks: [...taskSeconds.values()]
+      .sort((a, b) => b.seconds - a.seconds)
+      .slice(0, 8),
+    topTags: [...tagSeconds.values()]
+      .sort((a, b) => b.seconds - a.seconds)
+      .slice(0, 5),
+    topDepartments: [...departmentSeconds.values()]
+      .sort((a, b) => b.seconds - a.seconds)
+      .slice(0, 5)
+      .map(({ memberIds, ...department }) => ({
+        ...department,
+        memberCount: memberIds.size,
+      })),
+  }
+}
+
 // ─── Member analytics (owner/admin only) ─────────────────────────────────────
 
 export type MemberStat = {
@@ -1398,4 +1821,5 @@ export const trackerSchemas = {
   entryIdSchema,
   updateEntrySchema,
   inviteMemberSchema,
+  analyticsRangeSchema,
 }
